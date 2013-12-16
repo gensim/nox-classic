@@ -15,3 +15,6 @@ Makefile.in
 TAGS
 cscope.*
 tags
+/nox-classic.kdev4
+/.project
+*/*.kdev4

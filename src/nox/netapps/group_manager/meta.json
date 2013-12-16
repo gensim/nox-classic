@@ -1,0 +1,11 @@
+{
+    "components": [
+        {
+            "name": "group_manager" ,
+            "library": "group_manager" ,
+            "dependencies": [
+                "topology"
+            ]
+        }
+    ]
+}

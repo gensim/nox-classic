@@ -13,6 +13,7 @@
                 ],
             "Datapath_join_event": [
                 "topology",
+                "group_manager",
                 "datapathmem",
                 "linkload",
                 "authenticator",
@@ -57,6 +58,7 @@
                 ],
             "Link_event": [
                 "topology",
+                "group_manager",
                 "authenticator",
                 "lavi_swlinks",
                 "routing_module"
@@ -73,6 +75,7 @@
                 "linkload",
                 "cswitchstats",
                 "topology",
+                "group_manager",
                 "authenticator"
                 ],
             "Port_stats_in_event": [
@@ -112,7 +115,10 @@
             "Host_location_event": [
 	            "lavi_hosts",
                 "lavi_host2sw"
-                ]        
+                ], 
+            "Group_event": [
+                "mc_routing_module"
+                ]
 	        }
         }
 }

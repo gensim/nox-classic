@@ -38,6 +38,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include "hash_map.hh" // hash fn defined at end of file
 
 namespace vigil {
 
@@ -663,5 +664,14 @@ bool ipaddr::isPrivate()
 //-----------------------------------------------------------------------------
 
 }
+
+ENTER_HASH_NAMESPACE
+template <>
+struct hash<vigil::ipaddr> {
+    std::size_t operator() (const vigil::ipaddr& ip) const {
+        return HASH_NAMESPACE::hash<uint32_t>()(ip.addr);
+    }
+};
+EXIT_HASH_NAMESPACE
 
 #endif  // -- IPADDR_HH

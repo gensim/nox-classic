@@ -1,0 +1,11 @@
+{
+    "components": [
+        {
+            "name": "mc_routing_module" ,
+            "library": "mc_routing_module" ,
+            "dependencies": [
+                "topology"
+            ]
+        }
+    ]
+}

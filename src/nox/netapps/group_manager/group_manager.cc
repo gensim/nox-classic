@@ -42,13 +42,6 @@ const ipaddr Group_manager::ALL_HOST_MULTICAST_ADDR(0xE0000001);
 const ipaddr Group_manager::ALL_ROUTERS_MULTICAST_ADDR(0xE0000002);
 const ipaddr Group_manager::IGMP_V3_REPORT_ADDR(0xE0000016);
 
-std::size_t 
-Group_manager::iphash::operator()(const ipaddr& ip) const
-{
-    HASH_NAMESPACE::hash<uint32_t> u32hash;
-    return  u32hash(ip);
-}
-
 std::size_t
 Group_manager::lochash::operator()(const Interface& face) const
 {
@@ -96,9 +89,7 @@ Group_manager::install()
     //register event handlers 
       
     register_handler<Datapath_join_event>
-        (boost::bind(&Group_manager::handle_datapath_join, this, _1));  
-    register_handler<Datapath_leave_event>
-        (boost::bind(&Group_manager::handle_datapath_leave, this, _1));
+        (boost::bind(&Group_manager::handle_datapath_join, this, _1)); 
     register_handler<Port_status_event>
         (boost::bind(&Group_manager::handle_port_status, this, _1)); 
     register_handler<Link_event>
@@ -132,12 +123,6 @@ Group_manager::handle_datapath_join(const Event& e)
         if(p_iter->port_no <= 0 || p_iter->port_no >= OFPP_MAX) continue;
         start_general_query_timer((Interface){dj.datapath_id, p_iter->port_no});
     }
-    return CONTINUE;
-}
-    
-Disposition 
-Group_manager::handle_datapath_leave(const Event& e)
-{
     return CONTINUE;
 }
     
@@ -508,6 +493,7 @@ Group_manager::add_group(const Group& g)
     if(gr_map.find(g) == gr_map.end()) {
         VLOG_INFO(lg, "Add Group: %s %d %s", g.dp.string().c_str(), g.port, g.addr.string().c_str());
         gr_map[g] = (RecordPtr) new Record();
+        post(new Group_event(g.addr, g.dp, g.port, Group_event::ADD));
         return true;
     }
     return false;
@@ -528,6 +514,7 @@ Group_manager::delete_group(const Group& g)
         gr_map[g]->gs_timer.cancel();
         gr_map[g]->gss_timer.cancel();
         gr_map.erase(g);  
+        post(new Group_event(g.addr, g.dp, g.port, Group_event::REMOVE));
         return true;
     }
     return false;
@@ -538,6 +525,7 @@ Group_manager::add_group_source(const Group& g, const ipaddr& src)
 {
     if(gr_map.find(g) != gr_map.end() && gr_map[g]->st_map.find(src) == gr_map[g]->st_map.end()) {
         VLOG_INFO(lg, "Add Group Source: %s %d %s %s", g.dp.string().c_str(), g.port, g.addr.string().c_str(), src.string().c_str());
+        post(new Group_event(g.addr, g.dp, g.port, src, Group_event::ADD));
         return true;
     }
     return false;
@@ -550,6 +538,7 @@ Group_manager::delete_group_source(const Group& g, const ipaddr& src)
         VLOG_INFO(lg, "Delete Group Source: %s %d %s %s", g.dp.string().c_str(), g.port, g.addr.string().c_str(), src.string().c_str());  
         gr_map[g]->st_map[src].cancel();
         gr_map[g]->st_map.erase(src);
+        post(new Group_event(g.addr, g.dp, g.port, src, Group_event::REMOVE));
         return true;
     }
     return false;

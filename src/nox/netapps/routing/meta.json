@@ -35,6 +35,7 @@
             "name": "routing_module" ,
             "library": "routing_module" ,
             "dependencies": [
+                "linkload",
                 "topology",
                 "nat_enforcer"
             ]

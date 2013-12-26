@@ -5,6 +5,7 @@
 #include "hash_map.hh"
 #include "hash_set.hh"
 #include "topology/topology.hh"
+#include "group-event.hh"
 
 namespace vigil {
 namespace applications {
@@ -61,13 +62,9 @@ private:
         ipaddr addr;
     } Group;
       
-    struct iphash {
-        std::size_t operator()(const ipaddr& ip) const;
-    };    
-
-    typedef hash_map<ipaddr, Timer, iphash> SrcTimerMap; 
-    typedef hash_set<ipaddr, iphash> SrcTimeoutSet;
-    typedef hash_set<ipaddr, iphash> SourceSet;
+    typedef hash_map<ipaddr, Timer> SrcTimerMap; 
+    typedef hash_set<ipaddr> SrcTimeoutSet;
+    typedef hash_set<ipaddr> SourceSet;
     
     typedef struct record{
         record() {filter = IFM_INCLUDE; compat = ICM_V3;}
@@ -101,15 +98,14 @@ private:
     typedef boost::shared_ptr<Record> RecordPtr;
     typedef hash_map<Interface, Timer, lochash, loceq> GeneralQuerierMap; 
     typedef hash_map<Group, RecordPtr, grouphash, groupeq> GroupRecordMap;  
-    
+        
     GeneralQuerierMap gq_map;
     GroupRecordMap gr_map;
     Topology *topology;
     
     // event handler
     Disposition handle_igmp(const Event&);    
-    Disposition handle_datapath_join(const Event&);    
-    Disposition handle_datapath_leave(const Event&);    
+    Disposition handle_datapath_join(const Event&);       
     Disposition handle_port_status(const Event&);    
     Disposition handle_link_event(const Event&);    
     

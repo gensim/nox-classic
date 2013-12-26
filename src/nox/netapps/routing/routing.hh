@@ -36,6 +36,8 @@
 #include "netinet++/ethernetaddr.hh"
 #include "openflow/openflow.h"
 #include "topology/topology.hh"
+#include "networkstate/linkload.hh"
+#include "weight.hh"
 
 
 namespace vigil {
@@ -61,14 +63,49 @@ namespace applications {
  *
  */
 
+#define RATIO_CONGESTION 0.9
+#define RATIO_HIGH_MIDDLE 0.7
+#define RATIO_MIDDLE_LOW 0.4
+#define DEFAULT_ALPHA 1
+
 class Routing_module
     : public container::Component {
 
 public:
+    enum edge_phase {
+        EP_LOW,
+        EP_MIDDLE,
+        EP_HIGH,
+        EP_CONGESTION        
+    };
+    
+    struct Edge {
+        datapathid dpsrc;
+        datapathid dpdst;
+        uint16_t sport;
+        uint16_t dport;
+    };
+    
+    struct edgehash {
+        std::size_t operator()(const Edge& e) const;
+    };
+
+    struct edgeq {
+        bool operator()(const Edge& a, const Edge& b) const;
+    };
+    
+    struct EdgeState {
+        edge_phase phase;
+        weight eweight;
+    };
+    
+    typedef hash_map<Edge, EdgeState, edgehash, edgeq> EdgeMap;
+    
     struct Link {
         datapathid dst;    // destination dp of link starting at current dp
         uint16_t outport;  // outport of current dp link connected to
         uint16_t inport;   // inport of destination dp link connected to
+        weight lweight;
     };
 
     struct RouteId {
@@ -78,6 +115,7 @@ public:
 
     struct Route {
         RouteId id;            // Start/End datapath
+        weight rweight;        // total weights of route
         std::list<Link> path;  // links connecting datapaths
     };
 
@@ -192,12 +230,14 @@ private:
 
     Topology *topology;
     NAT_enforcer *nat;
+    linkload *lload;
     RouteMap shortest;
     RoutesMap local_routes;
     ExtensionMap left_local;
     ExtensionMap left_shortest;
     ExtensionMap right_local;
     ExtensionMap right_shortest;
+    EdgeMap edge_states;
 
     std::vector<const std::vector<uint64_t>*> nat_flow;
 
@@ -210,6 +250,10 @@ private:
     std::ostringstream os;
 
     Disposition handle_link_change(const Event&);
+    
+    weight get_weight(Edge);
+    void weight_probe();
+    void change_to_new_phase(EdgeMap::iterator& em_it, float ratio, edge_phase new_phase);
 
     // All-pairs shortest path fns
 

@@ -30,15 +30,13 @@
 #include "flow.hh"
 #include "hash_map.hh"
 #include "hash_set.hh"
-#include "discovery/link-event.hh"
+#include "networkstate/linkpw-event.hh"
 #include "nat_enforcer.hh"
 #include "netinet++/datapathid.hh"
 #include "netinet++/ethernetaddr.hh"
 #include "openflow/openflow.h"
 #include "topology/topology.hh"
 #include "networkstate/linkload.hh"
-#include "weight.hh"
-
 
 namespace vigil {
 namespace applications {
@@ -63,49 +61,16 @@ namespace applications {
  *
  */
 
-#define RATIO_CONGESTION 0.9
-#define RATIO_HIGH_MIDDLE 0.7
-#define RATIO_MIDDLE_LOW 0.4
-#define DEFAULT_ALPHA 1
-
 class Routing_module
     : public container::Component {
 
 public:
-    enum edge_phase {
-        EP_LOW,
-        EP_MIDDLE,
-        EP_HIGH,
-        EP_CONGESTION        
-    };
-    
-    struct Edge {
-        datapathid dpsrc;
-        datapathid dpdst;
-        uint16_t sport;
-        uint16_t dport;
-    };
-    
-    struct edgehash {
-        std::size_t operator()(const Edge& e) const;
-    };
-
-    struct edgeq {
-        bool operator()(const Edge& a, const Edge& b) const;
-    };
-    
-    struct EdgeState {
-        edge_phase phase;
-        weight eweight;
-    };
-    
-    typedef hash_map<Edge, EdgeState, edgehash, edgeq> EdgeMap;
     
     struct Link {
         datapathid dst;    // destination dp of link starting at current dp
         uint16_t outport;  // outport of current dp link connected to
         uint16_t inport;   // inport of destination dp link connected to
-        weight lweight;
+        linkweight weight;
     };
 
     struct RouteId {
@@ -115,8 +80,14 @@ public:
 
     struct Route {
         RouteId id;            // Start/End datapath
-        weight rweight;        // total weights of route
+        linkweight weight;    // total weights of route
         std::list<Link> path;  // links connecting datapaths
+        Route() {}
+        Route(RouteId id_) : id(id_) {}
+        void push_back(const Link&);
+        void push_front(const Link&);
+        void pop_back();
+        void pop_front();
     };
 
     typedef boost::shared_ptr<Route> RoutePtr;
@@ -237,7 +208,6 @@ private:
     ExtensionMap left_shortest;
     ExtensionMap right_local;
     ExtensionMap right_shortest;
-    EdgeMap edge_states;
 
     std::vector<const std::vector<uint64_t>*> nat_flow;
 
@@ -249,12 +219,8 @@ private:
 
     std::ostringstream os;
 
-    Disposition handle_link_change(const Event&);
+    Disposition handle_linkpw_change(const Event&);
     
-    weight get_weight(Edge);
-    void weight_probe();
-    void change_to_new_phase(EdgeMap::iterator& em_it, float ratio, edge_phase new_phase);
-
     // All-pairs shortest path fns
 
     void cleanup(RoutePtr, bool);

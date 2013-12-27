@@ -18,5 +18,12 @@
                 "datapathmem"
             ]
         }
+        {
+            "name": "linkweight" ,
+            "library": "linkweight" ,
+            "dependencies": [
+                "linkload"
+            ]
+        }
     ]
 }

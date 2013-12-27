@@ -61,6 +61,9 @@
                 "group_manager",
                 "authenticator",
                 "lavi_swlinks",
+                "linkphaseweight"
+                ],
+            "Linkpw_event": [
                 "routing_module"
                 ],
             "Flow_mod_event": [

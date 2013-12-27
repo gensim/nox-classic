@@ -8,9 +8,10 @@ AM_CPPFLAGS += $(PYTHON_CPPFLAGS)
 endif # PY_ENABLED 
 
 pkglib_LTLIBRARIES =\
+	linkweight.la \
 	linkload.la \
 	switchrtt.la \
-	datapathmem.la
+	datapathmem.la 
 
 datapathmem_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
 datapathmem_la_SOURCES = datapathmem.hh datapathmem.cc
@@ -23,6 +24,10 @@ switchrtt_la_LDFLAGS = -module -export-dynamic
 linkload_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
 linkload_la_SOURCES = linkload.hh linkload.cc
 linkload_la_LDFLAGS = -module -export-dynamic
+
+linkweight_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
+linkweight_la_SOURCES = linkweight.hh linkweight.cc
+linkweight_la_LDFLAGS = -module -export-dynamic
 
 NOX_RUNTIMEFILES = meta.json	
 

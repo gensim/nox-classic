@@ -31,21 +31,6 @@ namespace applications {
 
 static Vlog_module lg("routing");
 
-std::size_t 
-Routing_module::edgehash::operator()(const Edge& e) const
-{
-    HASH_NAMESPACE::hash<datapathid> dphash;
-    HASH_NAMESPACE::hash<uint16_t> u16hash;
-    return dphash(e.dpsrc) ^ dphash(e.dpdst) ^ u16hash(e.sport) ^ u16hash(e.dport); 
-}
-        
-bool 
-Routing_module::edgeq::operator()(const Edge& a, const Edge& b) const
-{
-    return (a.dpsrc == b.dpsrc && a.dpdst == b.dpdst &&
-            a.sport == b.sport && a.dport == b.dport);
-}
-
 std::size_t
 Routing_module::ridhash::operator()(const RouteId& rid) const
 {
@@ -63,8 +48,8 @@ std::size_t
 Routing_module::routehash::operator()(const RoutePtr& rte) const
 {    
     return (ridhash()(rte->id)
-        ^ HASH_NAMESPACE::hash<uint64_t>()(rte->rweight.Infinity())
-        ^ HASH_NAMESPACE::hash<uint64_t>()(rte->rweight.Value()));
+        ^ HASH_NAMESPACE::hash<uint64_t>()(rte->weight.Infinity())
+        ^ HASH_NAMESPACE::hash<uint64_t>()(rte->weight.Value()));
 }
 
 bool
@@ -91,7 +76,35 @@ Routing_module::routeq::operator()(const RoutePtr& a, const RoutePtr& b) const
 bool
 Routing_module::ruleptrcmp::operator()(const RoutePtr& a, const RoutePtr& b) const
 {
-    return ((a->rweight) > (b->rweight));
+    return ((a->weight) > (b->weight));
+}
+
+void 
+Routing_module::Route::push_back(const Routing_module::Link& link)
+{
+    weight += link.weight;
+    path.push_back(link);
+}
+
+void 
+Routing_module::Route::push_front(const Routing_module::Link& link)
+{
+    weight += link.weight;
+    path.push_front(link);
+}
+
+void
+Routing_module::Route::pop_back()
+{
+    weight -= path.back().weight;
+    path.pop_back();
+}
+
+void
+Routing_module::Route::pop_front()
+{
+    weight -= path.front().weight;
+    path.pop_front();
 }
 
 static
@@ -130,16 +143,14 @@ Routing_module::configure(const container::Configuration*)
     resolve(topology);
     resolve(nat);
     resolve(lload);
-    register_handler<Link_event>
-        (boost::bind(&Routing_module::handle_link_change, this, _1));
+    register_handler<Linkpw_event>
+        (boost::bind(&Routing_module::handle_linkpw_change, this, _1));
 }
 
 void
 Routing_module::install()
 {
-    post(boost::bind(&Routing_module::weight_probe, this));
 }
-
 
 bool
 Routing_module::get_route(const RouteId& id, RoutePtr& route) const
@@ -189,109 +200,48 @@ Routing_module::is_on_path_location(const RouteId& id, uint16_t src_port,
 // to Dynamic All Pairs Shortest Paths" - C. Demetrescu
 
 Disposition
-Routing_module::handle_link_change(const Event& e)
+Routing_module::handle_linkpw_change(const Event& e)
 {
-    const Link_event& le = assert_cast<const Link_event&>(e);
+    const Linkpw_event& le = assert_cast<const Linkpw_event&>(e);
 
-    Edge edge = { le.dpsrc, le.dpdst, le.sport, le.dport };
     RouteQueue new_candidates;
-    RoutePtr route(new Route());
-    Link tmp = { le.dpdst, le.sport, le.dport , get_weight(edge)};
-    route->id.src = le.dpsrc;
-    route->id.dst = le.dpdst;
-    route->path.push_back(tmp);
-    route->rweight = tmp.lweight;
-    if (le.action == Link_event::REMOVE) {
-        edge_states.erase(edge);
-        cleanup(route, true);
+    RouteId rid = {le.dpsrc, le.dpdst};
+    RoutePtr new_route, old_route, left_subpath, right_subpath;
+    
+    if (le.action == Linkpw_event::REMOVE) {
+        old_route = (RoutePtr) new Route(rid);
+        old_route->push_back((Link){ le.dpdst, le.sport, le.dport , le.old_weight});
+        cleanup(old_route, true);
         fixup(new_candidates, true);
-    } else if (le.action == Link_event::ADD) {
-        if(edge_states.find(edge) == edge_states.end()) edge_states[edge] = (EdgeState){EP_LOW, route->rweight};
-        RoutePtr left_subpath(new Route());
-        RoutePtr right_subpath(new Route());
-        left_subpath->id.src = left_subpath->id.dst = le.dpsrc;
-        right_subpath->id.src = right_subpath->id.dst = le.dpdst;
-        add(local_routes, route);
-        add(left_local, route, right_subpath);
-        add(right_local, route, left_subpath);
-        new_candidates.push(route);
+    } else if (le.action == Linkpw_event::ADD) {
+        new_route = (RoutePtr) new Route(rid);
+        new_route->push_back((Link){ le.dpdst, le.sport, le.dport , le.new_weight});
+        left_subpath = (RoutePtr) new Route(rid);
+        right_subpath = (RoutePtr) new Route(rid);
+        add(local_routes, new_route);
+        add(left_local, new_route, right_subpath);
+        add(right_local, new_route, left_subpath);
+        new_candidates.push(new_route);
+        fixup(new_candidates, false);
+    } else if (le.action == Linkpw_event::CHANGE) {
+        old_route = (RoutePtr) new Route(rid);
+        old_route->push_back((Link){ le.dpdst, le.sport, le.dport , le.old_weight});
+        new_route = (RoutePtr) new Route(rid);
+        new_route->push_back((Link){ le.dpdst, le.sport, le.dport , le.new_weight});
+        cleanup(old_route, true);
+        fixup(new_candidates, true);
+        left_subpath = (RoutePtr) new Route(rid);
+        right_subpath = (RoutePtr) new Route(rid);
+        add(local_routes, new_route);
+        add(left_local, new_route, right_subpath);
+        add(right_local, new_route, left_subpath);
+        new_candidates.push(new_route);
         fixup(new_candidates, false);
     } else {
         VLOG_ERR(lg, "Unknown link event action %u", le.action);
     }
 
     return CONTINUE;
-}
-
-weight 
-Routing_module::get_weight(Edge e)
-{ 
-    if(edge_states.find(e) == edge_states.end()) return weight(1);
-    return edge_states[e].eweight;    
-}
-
-void 
-Routing_module::weight_probe()
-{
-    EdgeMap::iterator em_it = edge_states.begin();
-    while(em_it != edge_states.end()) {
-        float tx_ratio, rx_ratio, ratio;
-        edge_phase old_phase, new_phase;
-        bool is_change = false;
-        
-        linkload::load tx_load = lload->get_link_load(em_it->first.dpsrc, em_it->first.sport);
-        linkload::load rx_load = lload->get_link_load(em_it->first.dpdst, em_it->first.dport);
-        if(tx_load.interval == 0) tx_ratio = 0;
-        else tx_ratio = lload->get_link_load_ratio(em_it->first.dpsrc, em_it->first.sport);
-        if(rx_load.interval == 0) rx_ratio = 0;
-        else rx_ratio = lload->get_link_load_ratio(em_it->first.dpdst, em_it->first.dport);
-        ratio = (tx_ratio >= rx_ratio) ? tx_ratio : rx_ratio ;
-        
-        old_phase = em_it->second.phase;
-        if(ratio > RATIO_CONGESTION)
-            new_phase = EP_CONGESTION;
-        else if(ratio > RATIO_HIGH_MIDDLE && ratio <= RATIO_CONGESTION)
-            new_phase = EP_HIGH;
-        else if(ratio > RATIO_HIGH_MIDDLE && ratio <= RATIO_CONGESTION)
-            new_phase = EP_MIDDLE;
-        else if(ratio > RATIO_HIGH_MIDDLE && ratio <= RATIO_CONGESTION)
-            new_phase = EP_LOW;
-        
-        if(old_phase != EP_CONGESTION) {
-            if(new_phase == EP_CONGESTION) 
-                is_change = true;
-            else if(new_phase < old_phase)
-                is_change = true;
-        } else {
-            if(new_phase < EP_HIGH)
-                is_change = true;
-        }
-        
-        if(is_change) change_to_new_phase(em_it, ratio, new_phase);
-        
-        em_it++;
-    }
-    
-    post(boost::bind(&Routing_module::weight_probe, this), (timeval){lload->load_interval, 0});
-}
-
-void
-Routing_module::change_to_new_phase(EdgeMap::iterator& em_it, float ratio, edge_phase new_phase)
-{
-    weight new_weight;
-    
-    new_weight = (uint64_t)(1 + (1.0/DEFAULT_ALPHA-1) * ratio);
-    
-    if(new_phase == EP_CONGESTION) new_weight.setInfinity(1);
-    
-    em_it->second.phase = new_phase;
-    if(em_it->second.eweight != new_weight) {
-        Link_event remove_event(em_it->first.dpsrc, em_it->first.dpdst, em_it->first.sport, em_it->first.dport, Link_event::REMOVE);
-        Link_event add_event(em_it->first.dpsrc, em_it->first.dpdst, em_it->first.sport, em_it->first.dport, Link_event::ADD);
-        handle_link_change(remove_event);
-        em_it->second.eweight = new_weight;
-        handle_link_change(add_event);
-    }
 }
 
 void
@@ -358,7 +308,7 @@ Routing_module::clean_subpath(RoutePtr& subpath, const RouteList& extensions,
 
     if (is_left_extension) {
         tmplink = subpath->path.back();
-        subpath->path.pop_back();
+        subpath->pop_back();
         if (subpath->path.empty()) {
             subpath->id.dst = subpath->id.src;
         } else {
@@ -366,11 +316,10 @@ Routing_module::clean_subpath(RoutePtr& subpath, const RouteList& extensions,
         }
     } else {
         tmplink = subpath->path.front();
-        subpath->path.pop_front();
+        subpath->pop_front();
         tmpdp = subpath->id.src;
         subpath->id.src = tmplink.dst;
     }
-    subpath->rweight -= tmplink.lweight;
 
     for (RouteList::const_iterator rte = extensions.begin();
          rte != extensions.end(); ++rte)
@@ -379,12 +328,11 @@ Routing_module::clean_subpath(RoutePtr& subpath, const RouteList& extensions,
         to_clean.insert(*rte);
     }
 
-    subpath->rweight += tmplink.lweight;
     if (is_left_extension) {
-        subpath->path.push_back(tmplink);
+        subpath->push_back(tmplink);
         subpath->id.dst = tmplink.dst;
     } else {
-        subpath->path.push_front(tmplink);
+        subpath->push_front(tmplink);
         subpath->id.src = tmpdp;
     }
 }
@@ -402,26 +350,22 @@ Routing_module::clean_route(const RoutePtr& route,
         if (cleaned_left) {
             tmpdp = subpath->id.src;
             subpath->id.src = route->id.src;
-            subpath->rweight += route->rweight;
-            subpath->path.push_front(route->path.front());
+            subpath->push_front(route->path.front());
             remove(right_local, route, subpath);
             if (is_short)
                 remove(right_shortest, route, subpath);
             subpath->id.src = tmpdp;
-            subpath->rweight -= route->path.front().lweight;
-            subpath->path.pop_front();
+            subpath->pop_front();
         } else {
             const Link& newlink = route->path.back();
             tmpdp = subpath->id.dst;
             subpath->id.dst = newlink.dst;
-            subpath->rweight += route->rweight;
-            subpath->path.push_back(newlink);
+            subpath->push_back(newlink);
             remove(left_local, route, subpath);
             if (is_short)
                 remove(left_shortest, route, subpath);
             subpath->id.dst = tmpdp;
-            subpath->rweight -= route->rweight;
-            subpath->path.pop_back();
+            subpath->pop_back();
         }
     }
 }
@@ -443,7 +387,7 @@ Routing_module::fixup(RouteQueue& new_candidates, bool add_least)
         new_candidates.pop();
         RouteMap::iterator old = shortest.find(route->id);
         if (old != shortest.end()) {
-            if (old->second->rweight <= route->rweight) {
+            if (old->second->weight <= route->weight) {
                 continue;
             }
             cleanup(old->second, false);
@@ -464,11 +408,11 @@ Routing_module::fixup(RouteQueue& new_candidates, bool add_least)
         add_local_routes(route, left_subpath, right_subpath, new_candidates);
         VLOG_DBG(lg, "route=(%llu,%llu,%d,%s), left_subpath=(%llu,%llu,%d,%s), right_subpath=(%llu,%llu,%d,%s)", 
                  route->id.src.as_host(), route->id.dst.as_host(),
-                 route->path.size(), route->rweight.string().c_str(),
+                 route->path.size(), route->weight.string().c_str(),
                  left_subpath->id.src.as_host(), left_subpath->id.dst.as_host(),
-                 left_subpath->path.size(), left_subpath->rweight.string().c_str(), 
+                 left_subpath->path.size(), left_subpath->weight.string().c_str(), 
                  right_subpath->id.src.as_host(), right_subpath->id.dst.as_host(),
-                 right_subpath->path.size(), right_subpath->rweight.string().c_str());
+                 right_subpath->path.size(), right_subpath->weight.string().c_str());
     }
 }
 
@@ -487,8 +431,7 @@ Routing_module::add_local_routes(const RoutePtr& route,
             RoutePtr new_local(new Route());
             *new_local = *route;
             new_local->id.src = (*rte)->id.src;
-            new_local->rweight += (*rte)->path.front().lweight;
-            new_local->path.push_front((*rte)->path.front());
+            new_local->push_front((*rte)->path.front());
             add(local_routes, new_local);
             add(left_local, new_local, route);
             add(right_local, new_local, *rte);
@@ -503,8 +446,7 @@ Routing_module::add_local_routes(const RoutePtr& route,
             RoutePtr new_local(new Route());
             *new_local = *route;
             new_local->id.dst = (*rte)->id.dst;
-            new_local->rweight += (*rte)->path.back().lweight;
-            new_local->path.push_back((*rte)->path.back());
+            new_local->push_back((*rte)->path.back());
             add(local_routes, new_local);
             add(left_local, new_local, *rte);
             add(right_local, new_local, route);
@@ -517,19 +459,16 @@ Routing_module::add_local_routes(const RoutePtr& route,
 void
 Routing_module::set_subpath(RoutePtr& subpath, bool left)
 {
-    weight w;
     if (left) {
-        subpath->rweight -= subpath->path.back().lweight;
-        subpath->path.pop_back();
+        subpath->pop_back();
         if (subpath->path.empty()) {
             subpath->id.dst = subpath->id.src;
             return;
         }
         subpath->id.dst = subpath->path.back().dst;
     } else {
-        subpath->rweight -= subpath->path.front().lweight;
         subpath->id.src = subpath->path.front().dst;
-        subpath->path.pop_front();
+        subpath->pop_front();
     }
 }
 
@@ -630,7 +569,7 @@ Routing_module::add(RoutesMap& routes, const RoutePtr& route)
         for (RouteList::iterator rte = rtes->second.begin();
              rte != rtes->second.end(); ++rte)
         {
-            if ((*rte)->rweight > route->rweight) {
+            if ((*rte)->weight > route->weight) {
                 rtes->second.insert(rte, route);
                 return;
             }

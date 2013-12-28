@@ -4,8 +4,13 @@
             "name": "group_manager" ,
             "library": "group_manager" ,
             "dependencies": [
+                "group event",
                 "topology"
             ]
+        },
+        {
+            "name": "group event" ,
+            "library": "group_event"
         }
     ]
 }

@@ -1,3 +1,4 @@
+#include "multicast_routing.hh"
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #include <boost/shared_array.hpp>
@@ -14,12 +15,10 @@
 #include "vlog.hh"
 #include "netinet++/ipaddr.hh"
 
-#include "multicast_routing.hh"
-
 namespace vigil {
 namespace applications {
     
-Vlog_module lg("multicast_routing");
+Vlog_module log("multicast_routing");
 
 std::size_t
 MC_routing_module::mtkhash::operator()(const MulticastTreeKey& mtk) const
@@ -78,7 +77,7 @@ MC_routing_module::handle_group_event(const Event& e)
         DestMap::iterator dm_it;
         PortSet::iterator ps_it;
         if(mtm_it == mt_map.end()) {
-            VLOG_ERR(lg, "Remove unknown multicast tree, group %s src %s", 
+            VLOG_ERR(log, "Remove unknown multicast tree, group %s src %s", 
                 ge.group.string().c_str(), ge.src.string().c_str());
             return CONTINUE;
         } else {
@@ -89,14 +88,14 @@ MC_routing_module::handle_group_event(const Event& e)
         
         dm_it = dmp->find(ge.dp);
         if(dm_it == dmp->end()) {
-            VLOG_ERR(lg, "Remove unknown multicast tree datapath, group %s src %s dp %s", 
+            VLOG_ERR(log, "Remove unknown multicast tree datapath, group %s src %s dp %s", 
                 ge.group.string().c_str(), ge.src.string().c_str(), ge.dp.string().c_str());
             return CONTINUE;
         }
         
         ps_it = dm_it->second.find(ge.port);
         if(ps_it == dm_it->second.end()) {
-            VLOG_ERR(lg, "Remove unknown multicast tree datapath port, group %s src %s dp %s port %u", 
+            VLOG_ERR(log, "Remove unknown multicast tree datapath port, group %s src %s dp %s port %u", 
                 ge.group.string().c_str(), ge.src.string().c_str(), ge.dp.string().c_str(), ge.port);
             return CONTINUE;
         }
@@ -143,7 +142,7 @@ MC_routing_module::handle_group_event(const Event& e)
         }
         
     } else {
-        VLOG_ERR(lg, "Unknown group event action %u", ge.action);
+        VLOG_ERR(log, "Unknown group event action %u", ge.action);
     }
     
     return CONTINUE;
@@ -159,7 +158,7 @@ void
 MC_routing_module::calculate_multicast_shared_tree(AdjListPtr& mctree, const DestMapPtr& dests) 
 {
     AdjListPtr graph ;
-    get_graph_from_topology(graph);    
+    get_graph(graph);    
     kmb_approximation_algorithm(mctree, graph, dests);
 }
 
@@ -171,7 +170,7 @@ MC_routing_module::kmb_approximation_algorithm(AdjListPtr& mctree, const AdjList
 }
 
 void 
-MC_routing_module::get_graph_from_topology(AdjListPtr& graph)
+MC_routing_module::get_graph(AdjListPtr& graph)
 {
     graph = (AdjListPtr) new AdjList();
     

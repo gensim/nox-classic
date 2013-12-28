@@ -30,13 +30,12 @@
 #include "flow.hh"
 #include "hash_map.hh"
 #include "hash_set.hh"
-#include "networkstate/linkpw-event.hh"
+#include "networkstate/linkphaseweight.hh"
 #include "nat_enforcer.hh"
 #include "netinet++/datapathid.hh"
 #include "netinet++/ethernetaddr.hh"
 #include "openflow/openflow.h"
 #include "topology/topology.hh"
-#include "networkstate/linkload.hh"
 
 namespace vigil {
 namespace applications {
@@ -70,7 +69,7 @@ public:
         datapathid dst;    // destination dp of link starting at current dp
         uint16_t outport;  // outport of current dp link connected to
         uint16_t inport;   // inport of destination dp link connected to
-        linkweight weight;
+        Linkweight weight;
     };
 
     struct RouteId {
@@ -80,7 +79,7 @@ public:
 
     struct Route {
         RouteId id;            // Start/End datapath
-        linkweight weight;    // total weights of route
+        Linkweight weight;    // total weights of route
         std::list<Link> path;  // links connecting datapaths
         Route() {}
         Route(RouteId id_) : id(id_) {}
@@ -201,7 +200,6 @@ private:
 
     Topology *topology;
     NAT_enforcer *nat;
-    linkload *lload;
     RouteMap shortest;
     RoutesMap local_routes;
     ExtensionMap left_local;

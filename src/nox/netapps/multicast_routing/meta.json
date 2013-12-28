@@ -4,6 +4,7 @@
             "name": "mc_routing_module" ,
             "library": "mc_routing_module" ,
             "dependencies": [
+                "group_manager",
                 "topology"
             ]
         }

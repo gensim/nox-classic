@@ -17,13 +17,19 @@
             "dependencies": [
                 "datapathmem"
             ]
-        }
+        },
         {
-            "name": "linkweight" ,
-            "library": "linkweight" ,
+            "name": "linkphaseweight" ,
+            "library": "linkphaseweight" ,
             "dependencies": [
-                "linkload"
+                "linkpw event",
+                "linkload",
+                "discovery"
             ]
+        },
+        {
+            "name": "linkpw event" ,
+            "library": "linkpw_event"
         }
     ]
 }

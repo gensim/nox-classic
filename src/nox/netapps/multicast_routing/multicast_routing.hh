@@ -76,7 +76,7 @@ private:
     bool find_src(const ipaddr& src) const;
     void calculate_multicast_shared_tree(AdjListPtr& mctree, const DestMapPtr& dests);
     void kmb_approximation_algorithm(AdjListPtr& mctree, const AdjListPtr& graph, const DestMapPtr& dests);
-    void get_graph_from_topology(AdjListPtr& graph);
+    void get_graph(AdjListPtr& graph);
     void get_complete_subgraph(AdjListPtr& subgraph, const AdjListPtr& graph, const DestMapPtr& dests);
 };
 

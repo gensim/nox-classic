@@ -80,7 +80,8 @@ void
 Group_manager::configure(const container::Configuration* conf) 
 {
     resolve(topology);
-    //register events   
+    //register events  
+    register_event(Group_event::static_get_name());
 }
 
 void

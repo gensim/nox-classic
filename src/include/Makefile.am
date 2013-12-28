@@ -39,6 +39,7 @@ hash_set.hh					\
 JSON_parser.h					\
 json_object.hh					\
 leak-checker.hh					\
+linkweight.hh					\
 netinet++/arp.hh				\
 netinet++/bpdu.hh				\
 netinet++/cidr.hh				\

@@ -33,7 +33,7 @@ namespace vigil
   {
   public:
       
-    enum linkphase {
+    enum Linkphase {
       LP_LOW,
       LP_MIDDLE,
       LP_HIGH,
@@ -56,8 +56,8 @@ namespace vigil
     };
     
     struct phaseweight {
-        linkphase phase;
-        linkweight weight;
+        Linkphase phase;
+        Linkweight weight;
     };
     
     typedef hash_map<Link, phaseweight, linkhash, linkeq> PhaseWeightMap;    
@@ -81,7 +81,7 @@ namespace vigil
       : Component(c)
     {}
     
-    /** \brief Configure linkweight.
+    /** \brief Configure linkphaseweight.
      * 
      * Parse the configuration, register event handlers, and
      * resolve any dependencies.
@@ -113,20 +113,20 @@ namespace vigil
     /** \brief Reference to link load
      */
     linkload* lload;
+    
     /** Iterator for probing
      */
-    hash_map<uint64_t,Datapath_join_event>::const_iterator dpi;
+    PhaseWeightMap::iterator pwm_it;
+    
+    /** \brief Update phaseweightmap
+     * @param it iterator of phaseweightmap
+     */
+    void updatePhaseWeight(PhaseWeightMap::iterator& it);
+    
     /** \brief Get next time to send probe
      *
      * @return time for next probe
      */
-    
-    PhaseWeightMap::iterator pwm_it;
-    
-    Disposition handle_link_change(const Event& e);
-    
-    void updatePhaseWeight(PhaseWeightMap::iterator& it);
-    
     timeval get_next_time();
             
   };

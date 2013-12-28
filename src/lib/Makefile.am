@@ -30,6 +30,7 @@ libnoxcore_la_SOURCES = \
 	JSON_parser.c \
 	json_object.cc \
 	leak-checker.cc \
+	linkweight.cc \
 	netinet++/ethernetaddr.cc \
 	network_graph.cc \
 	openflow-event.cc \

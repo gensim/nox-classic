@@ -31,6 +31,7 @@ routing_module_la_CPPFLAGS =							\
 	-I$(srcdir)/../								\
 	-I$(top_srcdir)/src/nox/ 						\
 	-I$(top_srcdir)/src/nox/coreapps/ 					\
+	-I$(top_srcdir)/src/nox/netapps/ 					\
 	-D__COMPONENT_FACTORY_FUNCTION__=routing_module_get_factory
 
 routing_module_la_SOURCES = routing.cc routing.hh

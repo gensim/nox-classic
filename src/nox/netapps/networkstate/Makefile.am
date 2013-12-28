@@ -7,12 +7,16 @@ if PY_ENABLED
 AM_CPPFLAGS += $(PYTHON_CPPFLAGS)
 endif # PY_ENABLED 
 
+noinst_HEADERS =		\
+	linkpw-event.hh
+
 pkglib_LTLIBRARIES =\
-	linkweight.la \
+	linkpw_event.la \
+	linkphaseweight.la \
 	linkload.la \
 	switchrtt.la \
 	datapathmem.la 
-
+	
 datapathmem_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
 datapathmem_la_SOURCES = datapathmem.hh datapathmem.cc
 datapathmem_la_LDFLAGS = -module -export-dynamic
@@ -25,9 +29,13 @@ linkload_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/
 linkload_la_SOURCES = linkload.hh linkload.cc
 linkload_la_LDFLAGS = -module -export-dynamic
 
-linkweight_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
-linkweight_la_SOURCES = linkweight.hh linkweight.cc
-linkweight_la_LDFLAGS = -module -export-dynamic
+linkphaseweight_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
+linkphaseweight_la_SOURCES = linkphaseweight.hh linkphaseweight.cc
+linkphaseweight_la_LDFLAGS = -module -export-dynamic
+
+linkpw_event_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
+linkpw_event_la_SOURCES = linkpw-event.cc
+linkpw_event_la_LDFLAGS = -module -export-dynamic
 
 NOX_RUNTIMEFILES = meta.json	
 

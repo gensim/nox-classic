@@ -5,7 +5,11 @@ CONFIGURE_DEPENCIES = $(srcdir)/Makefile.am
 EXTRA_DIST = \
 	meta.json
 
+noinst_HEADERS =		\
+	group-event.hh
+
 pkglib_LTLIBRARIES =		\
+	group_event.la		\
 	group_manager.la	
 
 group_manager_la_CPPFLAGS = 							\
@@ -15,6 +19,10 @@ group_manager_la_CPPFLAGS = 							\
 	-D__COMPONENT_FACTORY_FUNCTION__=group_manager_get_factory
 group_manager_la_SOURCES = group_manager.cc group_manager.hh
 group_manager_la_LDFLAGS = -module -export-dynamic
+
+group_event_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
+group_event_la_SOURCES = group-event.cc
+group_event_la_LDFLAGS = -module -export-dynamic
 
 NOX_RUNTIMEFILES = meta.json
 

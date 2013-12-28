@@ -4,8 +4,9 @@
 #include <boost/noncopyable.hpp>
 #include <stdint.h>
 
-#include "discovery/link-event.hh"
+#include "event.hh"
 #include "linkweight.hh"
+#include "netinet++/datapathid.hh"
 
 namespace vigil {
 
@@ -17,19 +18,22 @@ namespace vigil {
  */
 
 struct Linkpw_event
-    : public Link_event
+    : public Event,
+      boost::noncopyable
 {
     enum Action {
-        CHANGE = 2
+        ADD,
+        REMOVE,
+        CHANGE
     };
     
     Linkpw_event(datapathid dpsrc_, datapathid dpdst_,
                uint16_t sport_, uint16_t dport_,
-               Action action_, linkweight old_weight_);
+               Action action_, Linkweight weight_);
                
     Linkpw_event(datapathid dpsrc_, datapathid dpdst_,
                uint16_t sport_, uint16_t dport_,
-               Action action_, linkweight old_weight_, linkweight new_weight_);
+               Action action_, Linkweight old_weight_, Linkweight new_weight_);
         
     // -- only for use within python
     Linkpw_event();
@@ -38,8 +42,13 @@ struct Linkpw_event
         return "Linkpw_event";
     }
     
-    linkweight old_weight;
-    linkweight new_weight;
+    datapathid dpsrc;
+    datapathid dpdst;
+    uint16_t sport;
+    uint16_t dport;
+    Action action;
+    Linkweight old_weight;
+    Linkweight new_weight;
 };
 
 }

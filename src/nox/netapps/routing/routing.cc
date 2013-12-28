@@ -142,7 +142,7 @@ Routing_module::configure(const container::Configuration*)
 {    
     resolve(topology);
     resolve(nat);
-    resolve(lload);
+
     register_handler<Linkpw_event>
         (boost::bind(&Routing_module::handle_linkpw_change, this, _1));
 }

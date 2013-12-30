@@ -78,7 +78,7 @@ namespace vigil
     
     if(le.action == Link_event::REMOVE) {
         if(i !=  phaseweightmap.end()) {
-            post(new Linkpw_event(link.dpsrc, link.dpsrc, link.sport, link.dport, Linkpw_event::REMOVE, phaseweightmap[link].weight));
+            post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::REMOVE, phaseweightmap[link].weight));
             phaseweightmap.erase(i);
             
         } else {
@@ -88,7 +88,7 @@ namespace vigil
     } else if(le.action == Link_event::ADD) {
         if(i == phaseweightmap.end()) {
             phaseweightmap.insert(make_pair(link, (phaseweight){LP_LOW, Linkweight(1)}));
-            post(new Linkpw_event(link.dpsrc, link.dpsrc, link.sport, link.dport, Linkpw_event::ADD, phaseweightmap[link].weight));
+            post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::ADD, phaseweightmap[link].weight));
         } else {
             VLOG_WARN(lg, "Duplicate Remove Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
                 le.dpsrc.as_host(), le.dpdst.as_host(), le.sport, le.dport);

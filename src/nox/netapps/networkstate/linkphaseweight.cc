@@ -80,6 +80,7 @@ namespace vigil
         if(i !=  phaseweightmap.end()) {
             post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::REMOVE, phaseweightmap[link].weight));
             phaseweightmap.erase(i);
+            if(pwm_it == i) pwm_it++;
             
         } else {
             VLOG_WARN(lg, "Duplicate Add Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
@@ -149,7 +150,8 @@ namespace vigil
         is_post = true;
     }
 
-    if(is_post) {
+    if(is_post) {        
+      it->second.phase = new_phase;  
       Linkweight new_weight = (uint64_t)(1 + ((1.0/alpha) -1) * ratio);
       if(new_phase == LP_CONGESTION) new_weight.setInfinity(1);
       

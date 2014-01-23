@@ -118,6 +118,12 @@ namespace vigil
      */
     uint32_t get_link_speed(datapathid dpid, uint16_t port);
     
+    uint32_t register_dp_events_iterator();
+    
+    void next_dp_events_iterator(uint32_t idx);
+    
+    hash_map<uint64_t,Datapath_join_event>::const_iterator get_dp_events_iterator(uint32_t idx);
+    
     /** \brief Hash map of datapath join event.
      *
      * Indexed by datapath id in host order.
@@ -125,6 +131,8 @@ namespace vigil
      * considering all the Port_status_event changes.
      */
     hash_map<uint64_t,Datapath_join_event> dp_events;
+    
+    hash_map<uint32_t,hash_map<uint64_t,Datapath_join_event>::const_iterator> dpis;
 
   private:
   };

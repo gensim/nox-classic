@@ -30,8 +30,6 @@ namespace vigil
     register_handler<Datapath_leave_event>
       (boost::bind(&switchrtt::handle_dp_leave, this, _1));
 
-    dpi = dpmem->dp_events.begin();
-
     const hash_map<string,string> argmap = c->get_arguments_list();
     hash_map<string,string>::const_iterator i = argmap.find("interval");
     if (i != argmap.end())
@@ -56,7 +54,7 @@ namespace vigil
   
   void switchrtt::install()
   {
-    dpi = dpmem->dp_events.begin();
+    idx = dpmem->register_dp_events_iterator();
     
     post(boost::bind(&switchrtt::periodic_probe, this), get_next_time());
   }
@@ -121,10 +119,11 @@ namespace vigil
 
   void switchrtt::periodic_probe()
   {
-    if (dpmem->dp_events.size() != 0)
+    hash_map<uint64_t,Datapath_join_event>::const_iterator dpi = \
+        dpmem->get_dp_events_iterator(idx);
+    
+    if (dpi != dpmem->dp_events.end())
     {
-      if (dpi == dpmem->dp_events.end())
-	dpi = dpmem->dp_events.begin();
 
       VLOG_DBG(lg, "Send probe to %"PRIx64"",
 	       dpi->second.datapath_id.as_host());
@@ -137,7 +136,7 @@ namespace vigil
 				make_pair(currxid,now)));
       //Send echo request
       send_openflow_command(dpi->second.datapath_id,of_raw, false);
-      dpi++;
+      dpmem->next_dp_events_iterator(idx);
     }
     
     //Register for next probe

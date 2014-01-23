@@ -127,9 +127,9 @@ namespace vigil
     /** \brief Memory for OpenFlow packet
      */
     boost::shared_array<uint8_t> of_raw;
-    /** Iterator for probing
+    /** Indix of iterator for probing
      */
-    hash_map<uint64_t,Datapath_join_event>::const_iterator dpi;
+    uint32_t idx;
 
     /** \brief Get next time to send probe
      *

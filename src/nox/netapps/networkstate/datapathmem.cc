@@ -97,11 +97,20 @@ namespace vigil
 
     hash_map<uint64_t,Datapath_join_event>::iterator i = dp_events.find(dje.datapath_id.as_host());
     if (i == dp_events.end())
+    {
+      hash_map<uint32_t,uint64_t> dp_map;
+      hash_map<uint32_t,hash_map<uint64_t,Datapath_join_event>::const_iterator>::iterator it;
+      for(it = dpis.begin(); it != dpis.end(); it++) 
+          dp_map[it->first] = (it->second != dp_events.end()) ? it->second->first : dje.datapath_id.as_host();
       dp_events.insert(make_pair(dje.datapath_id.as_host(),
 				 Datapath_join_event(dje)));
+      for(it = dpis.begin(); it != dpis.end(); it++) it->second = dp_events.find(dp_map[it->first]);
+    }
     else
+    {
       VLOG_WARN(lg, "Duplicate datapath join from %"PRIx64" ignored!",
 		dje.datapath_id.as_host());
+    }
 
     return CONTINUE;
   }
@@ -114,13 +123,45 @@ namespace vigil
     
     hash_map<uint64_t,Datapath_join_event>::iterator i = dp_events.find(dle.datapath_id.as_host());
     if (i != dp_events.end())
+    {
+      hash_map<uint32_t,hash_map<uint64_t,Datapath_join_event>::const_iterator>::iterator it;  
+      for(it = dpis.begin(); it != dpis.end(); it++) if(it->second == i) next_dp_events_iterator(it->first);
       dp_events.erase(i);
+    }
     else
+    {
       VLOG_WARN(lg, "Datapath leave from unknown switch %"PRIx64" ignored!",
 		dle.datapath_id.as_host());
+    }
     
     return CONTINUE;
   }
+  
+  uint32_t datapathmem::register_dp_events_iterator()
+  {
+     uint32_t idx = dpis.size();
+     
+     dpis[idx] = dp_events.begin();
+     
+     return idx;     
+  }
+  
+  void datapathmem::next_dp_events_iterator(uint32_t idx)
+  {
+    if(idx >= dpis.size()) return;
+    if(dp_events.size() > 0) {
+        dpis[idx]++;
+        if(dpis[idx] == dp_events.end()) dpis[idx] = dp_events.begin();
+    } else {
+        dpis[idx] = dp_events.end();
+    }
+  }
+    
+  hash_map<uint64_t,Datapath_join_event>::const_iterator datapathmem::get_dp_events_iterator(uint32_t idx)
+  {
+    if(idx >= dpis.size()) return dp_events.end();
+    return dpis[idx];
+  }  
 
   REGISTER_COMPONENT(Simple_component_factory<datapathmem>,
 		     datapathmem);

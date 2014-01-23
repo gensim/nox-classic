@@ -402,7 +402,7 @@ class Spanning_Tree(Component):
                 port['flood'] = False
                 hw_addr = "\0\0" + port[core.HW_ADDR]
                 hw_addr = struct.unpack("!q", hw_addr)[0]
-                self.ctxt.send_port_mod(dp, port[core.PORT_NO], ethernetaddr(hw_addr),
+                self.ctxt.send_port_mod(dpid, port[core.PORT_NO], ethernetaddr(hw_addr),
                         openflow.OFPPC_NO_FLOOD, openflow.OFPPC_NO_FLOOD)
             self.datapaths[dpid][port['port_no']] = port
             self.port_count += 1

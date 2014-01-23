@@ -221,7 +221,7 @@ class dbWrapper(QtCore.QThread):
         self.db = QtSql.QSqlDatabase.addDatabase("QSQLITE")
         self.db.setDatabaseName("log.db");
         self.db.open()
-        self.q = QtSql.QSqlQuery()
+        self.q = QtSql.QSqlQuery(self.db)
         # Reset table (from last gui execution)
         self.q.exec_("DROP TABLE IF EXISTS messages") 
         self.q.exec_("CREATE TABLE messages (timestamp TEXT PRIMARY KEY, component TEXT, verbosity TEXT, message TEXT)")
@@ -254,8 +254,8 @@ class dbWrapper(QtCore.QThread):
     def insert_record(self, r):
         self.model.insertRecord(-1,r)
         
-        #self.model.submitAll()
-        #self.model.select()
+        self.model.submitAll()
+        self.model.select()
         if self.parent.filterWidget.autoScroll:
             self.parent.logDisplay.scrollToBottom()
         

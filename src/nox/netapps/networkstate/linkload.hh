@@ -166,9 +166,9 @@ namespace vigil
     /** \brief Reference to datapath memory
      */
     datapathmem* dpmem;
-    /** Iterator for probing
+    /** Indix of iterator for probing
      */
-    hash_map<uint64_t,Datapath_join_event>::const_iterator dpi;
+    uint32_t idx;
 
     /** \brief Send port stats request for switch and port
      * @param dpid switch to send port stats request to

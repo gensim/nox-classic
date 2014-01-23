@@ -33,24 +33,24 @@ namespace vigil
   
   void linkload::install()
   {
-    dpi = dpmem->dp_events.begin();
+    idx = dpmem->register_dp_events_iterator();
 
     post(boost::bind(&linkload::stat_probe, this), get_next_time());
   }
 
   void linkload::stat_probe()
   {
-    if (dpmem->dp_events.size() != 0)
+    hash_map<uint64_t,Datapath_join_event>::const_iterator dpi = \
+        dpmem->get_dp_events_iterator(idx);
+    
+    if (dpi != dpmem->dp_events.end())
     {
-      if (dpi == dpmem->dp_events.end())
-	dpi = dpmem->dp_events.begin();
-      
       VLOG_DBG(lg, "Send probe to %"PRIx64"",
 	       dpi->second.datapath_id.as_host());
 
       send_stat_req(dpi->second.datapath_id);
 
-      dpi++;
+      dpmem->next_dp_events_iterator(idx);
     }
 
     post(boost::bind(&linkload::stat_probe, this), get_next_time());
@@ -96,6 +96,8 @@ namespace vigil
     osr.pack((ofp_stats_request*) openflow_pack::get_pointer(of_raw));
     opsr.pack((ofp_port_stats_request*) openflow_pack::get_pointer(of_raw, sizeof(ofp_stats_request)));
 
+    hash_map<uint64_t,Datapath_join_event>::const_iterator dpi = \
+        dpmem->get_dp_events_iterator(idx);
     send_openflow_command(dpi->second.datapath_id,of_raw, false);
   }
 

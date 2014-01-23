@@ -72,45 +72,63 @@ namespace vigil
   {
     const Link_event& le = assert_cast<const Link_event&>(e);
     
-    Link link = { le.dpsrc, le.dpdst, le.sport, le.dport };
+    Link link = {le.dpsrc, le.dpdst, le.sport, le.dport};
     
     PhaseWeightMap::iterator i = phaseweightmap.find(link); 
     
     if(le.action == Link_event::REMOVE) {
         if(i !=  phaseweightmap.end()) {
             post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::REMOVE, phaseweightmap[link].weight));
-            phaseweightmap.erase(i);
             if(pwm_it == i) pwm_it++;
-            
+            phaseweightmap.erase(i);            
         } else {
-            VLOG_WARN(lg, "Duplicate Add Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
+            VLOG_WARN(lg, "Duplicate Remove Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
                 le.dpsrc.as_host(), le.dpdst.as_host(), le.sport, le.dport);
         }
     } else if(le.action == Link_event::ADD) {
         if(i == phaseweightmap.end()) {
+            Link tmp;
+            tmp = (pwm_it == phaseweightmap.end()) ? link: pwm_it->first;
             phaseweightmap.insert(make_pair(link, (phaseweight){LP_LOW, Linkweight(1)}));
+            pwm_it = phaseweightmap.find(tmp);
             post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::ADD, phaseweightmap[link].weight));
         } else {
-            VLOG_WARN(lg, "Duplicate Remove Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
+            VLOG_WARN(lg, "Duplicate Add Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
                 le.dpsrc.as_host(), le.dpdst.as_host(), le.sport, le.dport);
         }
     }
     return CONTINUE;
   }
   
+  Linkweight linkphaseweight::get_link_weight(const Link& link)
+  {
+    if(phaseweightmap.find(link) != phaseweightmap.end()) {
+      return phaseweightmap[link].weight;  
+    }
+    return Linkweight();
+  }
+  
+  Linkweight linkphaseweight::get_link_weight(datapathid dpsrc, datapathid dpdst, uint16_t sport, uint16_t dport)
+  {
+    return get_link_weight((Link){dpsrc, dpdst, sport, dport});
+  }
+  
   void linkphaseweight::periodic_probe()
   {
-    if (phaseweightmap.size() != 0)
+    if (pwm_it != phaseweightmap.end())
     {
-      if (pwm_it == phaseweightmap.end())
-    pwm_it = phaseweightmap.begin();
       
       VLOG_DBG(lg, "Probe weight to Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16")",
            pwm_it->first.dpsrc.as_host(), pwm_it->first.dpdst.as_host(), pwm_it->first.sport, pwm_it->first.dport);
 
       updatePhaseWeight(pwm_it);
-
-      pwm_it++;
+      
+      if(phaseweightmap.size() > 0) {
+          pwm_it++;
+          if(pwm_it == phaseweightmap.end()) pwm_it = phaseweightmap.begin();
+      } else {
+          pwm_it = phaseweightmap.end();
+      }
     }
 
     post(boost::bind(&linkphaseweight::periodic_probe, this), get_next_time());

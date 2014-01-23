@@ -107,6 +107,10 @@ namespace vigil
     Disposition handle_link_change(const Event& e);
                 
     void periodic_probe();
+    
+    Linkweight get_link_weight(const Link& link);
+    
+    Linkweight get_link_weight(datapathid dpsrc, datapathid dpdst, uint16_t sport, uint16_t dport);
 
   private:
 

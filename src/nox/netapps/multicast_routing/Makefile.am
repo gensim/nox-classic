@@ -10,7 +10,9 @@ AM_CPPFLAGS += $(PYTHON_CPPFLAGS)
 endif # PY_ENABLED
 
 pkglib_LTLIBRARIES =		\
-	mc_routing_module.la	
+	mc_routing_module.la	\
+	mcrouteinstaller.la	\
+	simplemcrouting.la
 
 mc_routing_module_la_CPPFLAGS = 							\
 	$(AM_CPPFLAGS)								\
@@ -20,6 +22,24 @@ mc_routing_module_la_CPPFLAGS = 							\
 	-D__COMPONENT_FACTORY_FUNCTION__=mc_routing_module_get_factory
 mc_routing_module_la_SOURCES = multicast_routing.cc multicast_routing.hh
 mc_routing_module_la_LDFLAGS = -module -export-dynamic
+
+mcrouteinstaller_la_CPPFLAGS = 							\
+	$(AM_CPPFLAGS)								\
+	-I$(srcdir)/../								\
+	-I$(top_srcdir)/src/nox/ 						\
+	-I$(top_srcdir)/src/nox/coreapps/ 					\
+	-D__COMPONENT_FACTORY_FUNCTION__=mc_routing_module_get_factory
+mcrouteinstaller_la_SOURCES = mcrouteinstaller.cc mcrouteinstaller.hh
+mcrouteinstaller_la_LDFLAGS = -module -export-dynamic
+
+simplemcrouting_la_CPPFLAGS = 							\
+	$(AM_CPPFLAGS)								\
+	-I$(srcdir)/../								\
+	-I$(top_srcdir)/src/nox/ 						\
+	-I$(top_srcdir)/src/nox/coreapps/ 					\
+	-D__COMPONENT_FACTORY_FUNCTION__=mc_routing_module_get_factory
+simplemcrouting_la_SOURCES = simplemcrouting.cc simplemcrouting.hh
+simplemcrouting_la_LDFLAGS = -module -export-dynamic
 
 NOX_RUNTIMEFILES = meta.json
 

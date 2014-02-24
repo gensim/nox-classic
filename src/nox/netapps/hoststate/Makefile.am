@@ -9,8 +9,18 @@ endif # PY_ENABLED
 
 pkglib_LTLIBRARIES =\
 	hostip.la \
+	trackhostip_pktin.la \
+	hostiptracker.la \
 	trackhost_pktin.la \
 	hosttracker.la 
+
+hostiptracker_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
+hostiptracker_la_SOURCES = hostiptracker.hh hostiptracker.cc
+hostiptracker_la_LDFLAGS = -module -export-dynamic
+
+trackhostip_pktin_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
+trackhostip_pktin_la_SOURCES = trackhostip_pktin.hh trackhostip_pktin.cc
+trackhostip_pktin_la_LDFLAGS = -module -export-dynamic
 
 hosttracker_la_CPPFLAGS = $(AM_CPPFLAGS) -I $(top_srcdir)/src/nox -I $(top_srcdir)/src/nox/netapps/
 hosttracker_la_SOURCES = hosttracker.hh hosttracker.cc

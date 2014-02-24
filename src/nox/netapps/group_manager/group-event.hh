@@ -23,7 +23,9 @@ struct Group_event
 {
     enum Action {
         ADD,
-        REMOVE
+        REMOVE,
+        TOEXCLUDE,
+        TOINCLUDE
     };
 
     Group_event(ipaddr group_, datapathid dp_, uint16_t port_, Action action_);

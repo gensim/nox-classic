@@ -219,22 +219,23 @@ Group_manager::process_record_source(const Group& g, SourceSet& ss, const uint8_
             if(gr_map[g]->compat == ICM_V1) break;
         case igmpv3_record_type::ALLOW:            
         case igmpv3_record_type::IS_IN:
-            for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {
+            for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {                                           // (B)=GMI
                 start_group_source_timer(g, *ss_iter);
             }
             if(gr_map[g]->filter == IFM_EXCLUDE) {
-                for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {
-                    delete_group_timeout_source(g, *ss_iter);
+                for(sts_iter=gr_map[g]->st_set.begin(); sts_iter!=gr_map[g]->st_set.end(); sts_iter++) { // Delete (Y*A)
+                    if(ss.find(*sts_iter) != ss.end()) 
+                        delete_group_timeout_source(g, *sts_iter);                                            // STS=Y-A
                 } 
             }
             if(type == igmpv3_record_type::TO_IN) {
                 query_set.clear();
                 for(stm_iter=gr_map[g]->st_map.begin(); stm_iter!=gr_map[g]->st_map.end(); stm_iter++) {
                     if(ss.find(stm_iter->first) == ss.end()) 
-                        query_set.insert(*ss_iter);
+                        query_set.insert(stm_iter->first);
                 } 
-                start_group_source_specific_query_timer(g, query_set);
-                if(gr_map[g]->filter == IFM_EXCLUDE) start_group_specific_query_timer(g);    
+                start_group_source_specific_query_timer(g, query_set);                                  // Send Q(G,STM)
+                if(gr_map[g]->filter == IFM_EXCLUDE) start_group_specific_query_timer(g);                      // GM=GMI
             }
             break;
         case igmpv3_record_type::TO_EX:
@@ -242,39 +243,39 @@ Group_manager::process_record_source(const Group& g, SourceSet& ss, const uint8_
         case igmpv3_record_type::IS_EX:
             if(gr_map[g]->filter == IFM_INCLUDE) {
                 gr_map[g]->filter = IFM_EXCLUDE;
-                query_set.clear();
-                for(stm_iter=gr_map[g]->st_map.begin(); stm_iter!=gr_map[g]->st_map.end(); stm_iter++) {
-                    if(ss.find(stm_iter->first) == ss.end()) 
-                        delete_group_source(g, *ss_iter);
-                }
-                for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {
+                post(new Group_event(g.addr, g.dp, g.port, Group_event::TOEXCLUDE));
+                for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {                                       // (B-A)=0
                     if(gr_map[g]->st_map.find(*ss_iter) == gr_map[g]->st_map.end()) 
-                        add_group_timeout_source(g, *ss_iter);
+                        add_group_timeout_source(g, *ss_iter);                                              // STS=(B-A)
+                }
+                for(stm_iter=gr_map[g]->st_map.begin(); stm_iter!=gr_map[g]->st_map.end(); stm_iter++) { // Delete (A-B)
+                    if(ss.find(stm_iter->first) == ss.end()) 
+                        delete_group_source(g, stm_iter->first);                                            // STM=(A*B)
                 }
             } else if(gr_map[g]->filter == IFM_EXCLUDE) {
-                for(stm_iter=gr_map[g]->st_map.begin(); stm_iter!=gr_map[g]->st_map.end(); stm_iter++) {
-                    if(ss.find(stm_iter->first) == ss.end()) 
-                        delete_group_source(g, *ss_iter);
+                for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {                                   // (A-X-Y)=GMI 
+                    if(gr_map[g]->st_map.find(*ss_iter) == gr_map[g]->st_map.end()&& 
+                        gr_map[g]->st_set.find(*ss_iter) == gr_map[g]->st_set.end())
+                        start_group_source_timer(g, *ss_iter);                                  // STM=X+(A-X-Y)=X+(A-Y)
                 }
-                for(sts_iter=gr_map[g]->st_set.begin(); sts_iter!=gr_map[g]->st_set.end(); sts_iter++) {
-                    if(ss.find(stm_iter->first) == ss.end()) 
-                        delete_group_timeout_source(g, *ss_iter);
-                }
-                for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {
-                    if(gr_map[g]->st_set.find(*ss_iter) == gr_map[g]->st_set.end() &&
-                        gr_map[g]->st_map.find(*ss_iter) == gr_map[g]->st_map.end()) {
-                        start_group_source_timer(g, *ss_iter);                        
-                    }
-                }                  
+                for(stm_iter=gr_map[g]->st_map.begin(); stm_iter!=gr_map[g]->st_map.end(); stm_iter++) { // Delete (X-A)
+                    if(ss.find(stm_iter->first) == ss.end() ||   
+                        gr_map[g]->st_set.find(stm_iter->first) != gr_map[g]->st_set.end()) 
+                        delete_group_source(g, stm_iter->first); // STM=((X+(A-Y))A)-Y=(AX+(A-Y))-Y=((AX-Y)+(A-Y))=(A-Y)
+                }  
+                for(sts_iter=gr_map[g]->st_set.begin(); sts_iter!=gr_map[g]->st_set.end(); sts_iter++) { // Delete (Y-A)
+                    if(ss.find(*sts_iter) == ss.end())                                                        
+                        delete_group_timeout_source(g, *sts_iter);                                            // STS=Y*A
+                }            
             }
             if(type == igmpv3_record_type::TO_EX) {
                 query_set.clear();
-                for(stm_iter=gr_map[g]->st_map.begin(); stm_iter!=gr_map[g]->st_map.end(); stm_iter++) {
+                for(stm_iter=gr_map[g]->st_map.begin(); stm_iter!=gr_map[g]->st_map.end(); stm_iter++) {  
                     query_set.insert(stm_iter->first);
                 }
-                start_group_source_specific_query_timer(g, query_set);
+                start_group_source_specific_query_timer(g, query_set);                                  // send Q(G,STM)
             }
-            start_group_member_timer(g, version);
+            start_group_member_timer(g, version);                                                              // GT=GMI
             break;
         case igmpv3_record_type::BLOCK:
             if(gr_map[g]->compat == ICM_V1 || gr_map[g]->compat == ICM_V2) break;
@@ -282,21 +283,21 @@ Group_manager::process_record_source(const Group& g, SourceSet& ss, const uint8_
             if(gr_map[g]->filter == IFM_INCLUDE) {
                 for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {
                     if(gr_map[g]->st_map.find(*ss_iter) != gr_map[g]->st_map.end()) 
-                        query_set.insert(*ss_iter);
+                        query_set.insert(*ss_iter);                                                    // Query_Set=(A*B)
                 }
             } else if(gr_map[g]->filter == IFM_EXCLUDE) {
                 for(ss_iter=ss.begin(); ss_iter!=ss.end(); ss_iter++) {
                     if(gr_map[g]->st_set.find(*ss_iter) == gr_map[g]->st_set.end()) 
-                        query_set.insert(*ss_iter);
+                        query_set.insert(*ss_iter);                                                    // Query_Set=(A-Y)
                 } 
                 
                 for(ss_iter=query_set.begin(); ss_iter!=query_set.end(); ss_iter++) {
                     if(gr_map[g]->st_map.find(*ss_iter) == gr_map[g]->st_map.end()) {
-                        start_group_source_timer(g, *ss_iter);
+                        start_group_source_timer(g, *ss_iter);                                              //(A-X-Y)=GMI
                     }
-                }               
+                } 
             }
-            start_group_source_specific_query_timer(g, query_set);            
+            start_group_source_specific_query_timer(g, query_set);                                 // Send Q(G,Query_Set)
             break;
     }        
 }
@@ -346,7 +347,10 @@ Group_manager::v3_group_member_callback(const Group& g)
     if(gr_map.find(g)==gr_map.end()) return; 
     if(gr_map[g]->filter == IFM_EXCLUDE) {
         gr_map[g]->filter = IFM_INCLUDE;
-        gr_map[g]->st_set.clear();
+        for(SrcTimeoutSet::iterator sts_iter=gr_map[g]->st_set.begin(); sts_iter!=gr_map[g]->st_set.end(); sts_iter++)
+            delete_group_timeout_source(g, *sts_iter);
+        if(gr_map[g]->st_map.size() > 0)
+            post(new Group_event(g.addr, g.dp, g.port, Group_event::TOINCLUDE));            
     }
     if(gr_map[g]->filter == IFM_INCLUDE && gr_map[g]->st_map.size() == 0) {
         delete_group(g);

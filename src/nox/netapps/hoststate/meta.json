@@ -13,6 +13,18 @@
             ]
         },
         {
+            "name": "hostiptracker" ,
+            "library": "hostiptracker" 
+        },
+        {
+            "name": "trackhostip_pktin" ,
+            "library": "trackhostip_pktin" , 
+            "dependencies": [
+                "hostiptracker",
+                "topology"
+            ]
+        },
+        {
             "name": "hostip" ,
             "library": "hostip" 
         }

@@ -167,8 +167,7 @@ public:
                      const GroupList *snwaddr_groups,
                      const GroupList *ddladdr_groups,
                      const GroupList *dnwaddr_groups);
-
-private:
+    
     struct ridhash {
         std::size_t operator()(const RouteId& rid) const;
     };
@@ -176,7 +175,7 @@ private:
     struct rideq {
         bool operator()(const RouteId& a, const RouteId& b) const;
     };
-
+    
     struct routehash {
         std::size_t operator()(const RoutePtr& rte) const;
     };
@@ -188,6 +187,8 @@ private:
     struct ruleptrcmp {
         bool operator()(const RoutePtr& a, const RoutePtr& b) const;
     };
+
+private:    
 
     typedef std::list<RoutePtr> RouteList;
     typedef hash_set<RoutePtr, routehash, routeq> RouteSet;

@@ -5,7 +5,24 @@
             "library": "mc_routing_module" ,
             "dependencies": [
                 "group_manager",
-                "topology"
+                "routing_module",
+                "trackhostip_pktin"
+            ]
+        },
+        {
+            "name": "mcrouteinstaller" ,
+            "library": "mcrouteinstaller" ,
+            "dependencies": [
+                "mc_routing_module",
+                "routeinstaller"
+            ]
+        }
+        {
+            "name": "simplemcrouting" ,
+            "library": "simplemcrouting" ,
+            "dependencies": [
+                "mcrouteinstaller",
+                "flowroute record"
             ]
         }
     ]

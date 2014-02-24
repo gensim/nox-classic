@@ -43,6 +43,7 @@
                 "noop",
                 "counter",
                 "packetdump",
+                "simplemcrouting",
                 "simplerouting",
                 "ctlflood",
                 "switch",
@@ -64,7 +65,8 @@
                 "linkphaseweight"
                 ],
             "Linkpw_event": [
-                "routing_module"
+                "routing_module",
+                "mc_routing_module"
                 ],
             "Flow_mod_event": [
                 "authenticator"
@@ -119,6 +121,9 @@
 	            "lavi_hosts",
                 "lavi_host2sw"
                 ], 
+            "HostIP_location_event": [
+                "mc_routing_module"
+                ],    
             "Group_event": [
                 "mc_routing_module"
                 ]

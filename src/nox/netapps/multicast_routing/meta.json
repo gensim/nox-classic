@@ -16,7 +16,7 @@
                 "mc_routing_module",
                 "routeinstaller"
             ]
-        }
+        },
         {
             "name": "simplemcrouting" ,
             "library": "simplemcrouting" ,

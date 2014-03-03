@@ -379,8 +379,9 @@ class webserver(Component):
         # items into siteConfig
         for key in p.keys():
             if key in [ "network_name", "port", "ssl_port" ] : 
-              list = p[key]
-              if len(list) > 0: self.siteConfig[key] = list[0]
+                val = p[key]
+                if isinstance(val, int): self.siteConfig[key] = val
+                elif len(val) > 0: self.siteConfig[key] = val[0]
 
         self.ssl_reconfigured = False
 
@@ -397,8 +398,8 @@ class webserver(Component):
                 sslContext = UIOpenSSLContextFactory(\
                     base64.b64decode(p['ssl_privatekey'][0]),
                     base64.b64decode(p['ssl_certificate'][0]))
-                if not p['ssl_port'][0] == 0:
-                    port = reactor.listenSSL(p['ssl_port'][0],
+                if not p['ssl_port'] == 0:
+                    port = reactor.listenSSL(p['ssl_port'],
                                              server.Site(self.root),
                                              contextFactory=sslContext)
                     self.using_ssl = True
@@ -423,7 +424,7 @@ class webserver(Component):
             self.port = None
 
             try:
-                if not p['port'][0] == 0:
+                if not p['port'] == 0:
                     if self.using_ssl:
                         class RedirectRes(resource.Resource):
                             def __init__(self, component):
@@ -459,7 +460,7 @@ class webserver(Component):
                         root = RedirectRes(self)
                     else:
                         root = self.root
-                    self.port = reactor.listenTCP(p['port'][0], 
+                    self.port = reactor.listenTCP(p['port'], 
                                                   server.Site(root))
                 else:
                     self.port = None
@@ -481,11 +482,11 @@ class webserver(Component):
 
         # Rebind the port only, if there's a change
         if (self.ssl_port == None and \
-                (not p['ssl_port'][0] == 0 and \
+                (not p['ssl_port'] == 0 and \
                      not p['ssl_privatekey'][0] == '' and \
                      not p['ssl_certificate'][0] == '')) or \
                 (not self.ssl_port == None and \
-                     (not self.ssl_port.port == p['ssl_port'][0] or \
+                     (not self.ssl_port.port == p['ssl_port'] or \
                           not self.ssl_privatekey == p['ssl_privatekey'][0] or \
                           not self.ssl_certificate == p['ssl_certificate'][0])):
             d.addCallback(close_https)
@@ -495,9 +496,9 @@ class webserver(Component):
 
         def restart_http_if_necessary(ign):
             if self.ssl_reconfigured or \
-                    (self.port == None and not p['port'][0] ==0) or \
+                    (self.port == None and not p['port'] ==0) or \
                     (not self.port == None and \
-                         not self.port.port == p['port'][0]):
+                         not self.port.port == p['port']):
                 return defer.succeed(None).\
                     addCallback(close_http).\
                     addCallback(restart_http)

@@ -37,6 +37,7 @@ from nox.lib.directory import LocationInfo
 DEFAULT_POLL_TABLE_PERIOD     = 5
 DEFAULT_POLL_PORT_PERIOD      = 5
 DEFAULT_POLL_AGGREGATE_PERIOD = 5
+DEFAULT_POLL_FLOW_PERIOD      = 5
 
 lg = logging.getLogger('switchstats')
 
@@ -82,17 +83,23 @@ class switchstats(Component):
         self.dp_table_stats = {}
         self.dp_desc_stats = {}
         self.dp_port_stats  = {}
+        self.dp_flow_stats = {}
 
 
     def port_timer(self, dp):
         if dp in self.dp_stats:
             self.ctxt.send_port_stats_request(dp)
-            self.post_callback(self.dp_poll_period[dp]['port'] + 1, lambda :  self.port_timer(dp))
+            self.post_callback(self.dp_poll_period[dp]['port'], lambda :  self.port_timer(dp))
 
     def table_timer(self, dp):
         if dp in self.dp_stats:
             self.ctxt.send_table_stats_request(dp)
             self.post_callback(self.dp_poll_period[dp]['table'], lambda : self.table_timer(dp))
+            
+    def flow_timer(self, dp):
+        if dp in self.dp_stats:        
+            self.ctxt.send_flow_stats_request(dp, set_match({}))
+            self.post_callback(self.dp_poll_period[dp]['flow'], lambda :  self.flow_timer(dp))
        
     def dp_join(self, dp, stats):
 
@@ -113,6 +120,7 @@ class switchstats(Component):
         self.dp_poll_period[dp]['table'] = DEFAULT_POLL_TABLE_PERIOD
         self.dp_poll_period[dp]['port']  = DEFAULT_POLL_PORT_PERIOD
         self.dp_poll_period[dp]['aggr']  = DEFAULT_POLL_AGGREGATE_PERIOD
+        self.dp_poll_period[dp]['flow']  = DEFAULT_POLL_FLOW_PERIOD
 
         # Switch descriptions do not change while connected, so just send once
         self.ctxt.send_desc_stats_request(dp)
@@ -120,8 +128,10 @@ class switchstats(Component):
         # stagger timers by one second
         self.post_callback(self.dp_poll_period[dp]['table'], 
                               lambda : self.table_timer(dp))
-        self.post_callback(self.dp_poll_period[dp]['port'] + 1, 
+        self.post_callback(self.dp_poll_period[dp]['port'], 
                               lambda : self.port_timer(dp))
+        self.post_callback(self.dp_poll_period[dp]['flow'], 
+                              lambda : self.flow_timer(dp))
 
         return CONTINUE
                 
@@ -141,7 +151,9 @@ class switchstats(Component):
         if self.dp_desc_stats.has_key(dp):
             del self.dp_desc_stats[dp]  
         if self.dp_port_stats.has_key(dp):
-            del self.dp_port_stats[dp]  
+            del self.dp_port_stats[dp]
+        if self.dp_flow_stats.has_key(dp):
+            del self.dp_flow_stats[dp]    
         if dp in self.port_listeners:    
             del self.port_listeners[dp]
 
@@ -189,7 +201,11 @@ class switchstats(Component):
             # XXX Fire listeners for port stats    
             self.fire_port_listeners(dpid, port['port_no'], port)
         self.dp_port_stats[dpid] = new_ports 
-
+        
+    def flow_stats_in_handler(self, dpid, flows, more, xid):
+         if dpid not in self.dp_flow_stats:
+            self.dp_flow_stats[dpid] = []
+         self.dp_flow_stats[dpid] = flows
 
     def port_status_handler(self, dpid, reason, port):
         intdp = int(dpid)
@@ -243,6 +259,8 @@ class switchstats(Component):
         self.register_for_desc_stats_in(self.desc_stats_in_handler)
 
         self.register_for_port_stats_in(self.port_stats_in_handler)
+        
+        self.register_for_flow_stats_in(self.flow_stats_in_handler)
         self.register_for_port_status(self.port_status_handler)
 
     def getInterface(self):

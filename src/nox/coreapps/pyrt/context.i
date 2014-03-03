@@ -119,12 +119,14 @@ public:
     uint32_t get_switch_ip(uint64_t dpid); 
 
     void send_table_stats_request(uint64_t datapath_id);
-    void send_port_stats_request(uint64_t datapath_id, uint16_t port);
+    void send_port_stats_request(uint64_t datapath_id, uint16_t port=OFPP_NONE);
     void send_desc_stats_request(uint64_t datapath_id);
     int  send_port_mod(uint64_t datapath_id, uint16_t port_no, 
                        ethernetaddr addr, uint32_t mask, uint32_t config);
+    void send_flow_stats_request(uint64_t datapath_ids, const
+        struct ofp_match& match, uint8_t table_id=0xFF);
     void send_aggregate_stats_request(uint64_t datapath_ids, const
-        struct ofp_match& match, uint8_t table_id);
+        struct ofp_match& match, uint8_t table_id=0xFF);
 private:
     PyContext();
 

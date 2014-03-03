@@ -6,6 +6,7 @@ EXTRA_DIST=\
 	webserver.py \
 	webauth.py \
 	static_www \
+	omniui_adapter.py \
 	dummywebpage.py
 
 # Required for static_www build/install
@@ -18,6 +19,7 @@ NOX_RUNTIMEFILES = \
 	meta.json \
     webserver.py \
 	webauth.py \
+	omniui_adapter.py \
 	dummywebpage.py
 
 # Executable scripts with the name "wwwroot-finalization-script.sh"

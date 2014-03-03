@@ -12,6 +12,15 @@
             "python": "nox.webapps.webserver.webauth"
         },
         {
+            "name": "omniui_adapter" ,
+            "dependencies": [
+                "webserver",
+                "discovery",
+                "switchstats"
+            ],
+            "python": "nox.webapps.webserver.omniui_adapter" 
+        },
+        {
             "name": "dummywebpage" ,
             "dependencies": [
                 "webserver"

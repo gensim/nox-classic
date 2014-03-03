@@ -393,6 +393,17 @@ PyContext::send_desc_stats_request(uint64_t datapath_id)
 }
 
 void
+PyContext::send_flow_stats_request(uint64_t datapath_id, const struct ofp_match& match, uint8_t table_id)
+{
+    ofp_flow_stats_request  fsr;
+    fsr.table_id = table_id;
+    fsr.match    = match;
+    fsr.out_port = htons(OFPP_NONE);
+    send_stats_request(datapath_id, OFPST_FLOW, (const
+    uint8_t*)&fsr, sizeof(struct ofp_flow_stats_request));
+}
+
+void
 PyContext::send_aggregate_stats_request(uint64_t datapath_id, const struct ofp_match& match, uint8_t table_id)
 {
     ofp_aggregate_stats_request  asr;

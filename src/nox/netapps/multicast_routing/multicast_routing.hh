@@ -37,13 +37,16 @@ public:
 
     static void getInstance(const container::Context* c, MC_routing_module*& component);
     
+    bool get_source_location(const ipaddr& src, network::route& route);
+    
     bool get_multicast_tree(const ipaddr& src, const ipaddr& group, 
                             AdjListPtr& tree, DstPortMapPtr& dsts);
     
     bool get_multicast_source_tree(const ipaddr& src, const ipaddr& group, 
-                            AdjListPtr& tree, DstPortMapPtr& dsts);
+                                   AdjListPtr& tree, DstPortMapPtr& dsts);
     
-    bool get_multicast_shared_tree(const ipaddr& group, AdjListPtr& tree, DstPortMapPtr& dsts);
+    bool get_multicast_shared_tree(const ipaddr& src, const ipaddr& group, 
+                                   AdjListPtr& tree, DstPortMapPtr& dsts);
 
 private:
   
@@ -204,7 +207,7 @@ private:
     AdjListPtr minimum_spanning_tree(const AdjListPtr& subgraph);
     AdjListPtr reverse_mintree(const AdjListPtr& tree, const RouteDirection& rd);
     void fixup_leaves(AdjListPtr& mctree, const AdjListPtr& mintree, const DstSetPtr& dsp);
-    void print_graph(const AdjListPtr& tree);
+    void print_graph(const AdjListPtr& graph);
 };
 
 }

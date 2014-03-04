@@ -177,7 +177,7 @@ Group_manager::handle_igmp(const Event& e)
         } else {
             VLOG_ERR(lg, "Unknow IGMP header type");
         }
-    } if(igmp_size > sizeof(igmpv3_report)) {
+    } else if(igmp_size > sizeof(igmpv3_report)) {
         igmpv3_report* igmpv3h = (igmpv3_report*) iph->data();
         VLOG_DBG(lg, "Recv IGMP: %s", igmpv3h->c_string());
         igmpv3_record* r = (igmpv3_record*) &igmpv3h->record[0];

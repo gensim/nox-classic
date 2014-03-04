@@ -34,20 +34,22 @@ namespace vigil
     const Packet_in_event& pie = assert_cast<const Packet_in_event&>(e);
 
     // Handle only multicast flow
-    if (pie.flow.dl_type != ethernet::IP ||
-        ipaddr((uint32_t)pie.flow.nw_src).isMulticast() ||
-        !ipaddr((uint32_t)pie.flow.nw_dst).isMulticast())
+    ipaddr src = (uint32_t)htonl(pie.flow.nw_src);
+    ipaddr dst = (uint32_t)htonl(pie.flow.nw_dst);
+    if (pie.flow.dl_type != ethernet::IP || 
+        pie.flow.nw_proto == ip_::proto::IGMP ||
+        src.isMulticast() || !dst.isMulticast())
       return CONTINUE;
 
-    //Route or at least try
-       
     network::route rte(pie.datapath_id, pie.in_port);
-    if (mri->get_multicast_tree_path(pie.flow.nw_src, pie.flow.nw_dst, rte))
+    if (mri->get_multicast_tree_path(src, dst, rte))
     {
-      mri->install_route(pie.flow, rte, pie.buffer_id);
+      VLOG_DBG(lg, "Install route datapath=%"PRIx64" src=%s dst=%s", 
+             pie.datapath_id.as_host(), src.string().c_str(), dst.string().c_str());
+      uint32_t wildcards = OFPFW_TP_SRC | OFPFW_TP_DST;      
+      mri->install_route(pie.flow, rte, pie.buffer_id, wildcards);
       if (post_flow_record)
         frr->set(pie.flow, rte);
-      return STOP;
     }   
 
     return CONTINUE;
@@ -70,6 +72,6 @@ namespace vigil
 			      (typeid(simplemcrouting).name())));
   }
 
-  REGISTER_COMPONENT(Simple_component_factory<simplemcrouting>,
+  REGISTER_COMPONENT(container::Simple_component_factory<simplemcrouting>,
 		     simplemcrouting);
 } // vigil namespace

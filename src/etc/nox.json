@@ -36,6 +36,7 @@
             "Packet_in_event": [
                 "spanning_tree",
                 "trackhost_pktin",
+                "trackhostip_pktin",
                 "sample_routing",
                 "hostip",
                 "authenticator",

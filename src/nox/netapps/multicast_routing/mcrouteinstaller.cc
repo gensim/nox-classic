@@ -29,6 +29,8 @@ namespace vigil
     MC_routing_module::DstPortMapPtr dsts;
     network::hop* newhop = NULL;
     route.next_hops.clear();
+    if(!mcrouting->get_source_location(src, route)) return false;
+    
     if(mcrouting->get_multicast_tree(src, group, tree, dsts)) {
         NodeQueue q;
         q.push((Node){datapathid(), route.in_switch_port.dpid, &route});
@@ -50,8 +52,9 @@ namespace vigil
                 }
             }
         }
+        return true;
     }
-    return true;
+    return false;
   }
 
   void mcrouteinstaller::install_route(const Flow& flow, network::route route, 
@@ -88,9 +91,7 @@ namespace vigil
 			      (typeid(mcrouteinstaller).name())));
   }
   
-} // namespace vigil
 
-namespace {
-  REGISTER_COMPONENT(vigil::container::Simple_component_factory<vigil::mcrouteinstaller>, 
-		     vigil::mcrouteinstaller);
+  REGISTER_COMPONENT(container::Simple_component_factory<mcrouteinstaller>, 
+		     mcrouteinstaller);
 } // unnamed namespace

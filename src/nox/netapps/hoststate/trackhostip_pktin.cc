@@ -18,8 +18,8 @@ namespace vigil
 
     if (!topo->is_internal(pie.datapath_id, pie.in_port) &&
 	!pie.flow.dl_src.is_multicast() && !pie.flow.dl_src.is_broadcast() &&
-	!ipaddr((uint32_t)pie.flow.nw_src).isMulticast() && pie.flow.nw_src!=0)
-      hit->add_location(pie.flow.nw_src, pie.datapath_id, pie.in_port);
+	!ipaddr((uint32_t)htonl(pie.flow.nw_src)).isMulticast() && pie.flow.nw_src!=0)
+      hit->add_location(htonl(pie.flow.nw_src), pie.datapath_id, pie.in_port);
     else
       VLOG_DBG(lg, "Host %"PRIx64" not registered, 'cos %s%s %s %s",
 	       pie.flow.dl_src.hb_long(),

@@ -37,7 +37,7 @@ namespace vigil
     ipaddr src = (uint32_t)htonl(pie.flow.nw_src);
     ipaddr dst = (uint32_t)htonl(pie.flow.nw_dst);
     if (pie.flow.dl_type != ethernet::IP || 
-        pie.flow.nw_proto == ip_::proto::IGMP ||
+        pie.flow.nw_proto != ip_::proto::UDP ||
         src.isMulticast() || !dst.isMulticast())
       return CONTINUE;
 

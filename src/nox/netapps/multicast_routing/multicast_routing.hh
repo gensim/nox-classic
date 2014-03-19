@@ -7,7 +7,6 @@
 #include "network_graph.hh"
 #include "routing/routing.hh"
 #include "topology/topology.hh"
-#include "networkstate/linkphaseweight.hh"
 #include "hoststate/hostiptracker.hh"
 
 namespace vigil {
@@ -47,6 +46,12 @@ public:
     
     bool get_multicast_shared_tree(const ipaddr& src, const ipaddr& group, 
                                    AdjListPtr& tree, DstPortMapPtr& dsts);
+                                   
+    bool has_multicast_route(ipaddr group, ipaddr src);
+    
+    bool has_multicast_route(ipaddr group);
+
+    size_t get_multicast_dst_size(ipaddr group);
 
 private:
   
@@ -183,7 +188,6 @@ private:
     hostiptracker *hit;   
     
     Disposition handle_group_event(const Event& e);
-    Disposition handle_linkpw_change(const Event& e);  
     Disposition handle_hostip_location(const Event& e);
     
     bool get_multicast_route(const ipaddr g, DstPortMapPtr& dsts, AdjListPtr& tree, MulticastSrcMapPtr& srcs);

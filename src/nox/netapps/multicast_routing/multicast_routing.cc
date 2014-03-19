@@ -40,8 +40,6 @@ MC_routing_module::install()
     //register event handlers 
     register_handler<Group_event>
         (boost::bind(&MC_routing_module::handle_group_event, this, _1));
-    register_handler<Linkpw_event>
-        (boost::bind(&MC_routing_module::handle_linkpw_change, this, _1));
     register_handler<HostIP_location_event>
         (boost::bind(&MC_routing_module::handle_hostip_location, this, _1));
 }
@@ -178,6 +176,28 @@ MC_routing_module::get_multicast_shared_tree(const ipaddr& src,
     return true;
 }
 
+bool 
+MC_routing_module::has_multicast_route(ipaddr group, ipaddr src)
+{
+    if(has_multicast_route(group)) 
+        return mt_map[group].srcs->find(src) != mt_map[group].srcs->end();
+    return false;
+}
+    
+bool 
+MC_routing_module::has_multicast_route(ipaddr group)
+{
+    return mt_map.find(group) != mt_map.end();
+}
+ 
+size_t 
+MC_routing_module::get_multicast_dst_size(ipaddr group)
+{
+    if(has_multicast_route(group))
+        return mt_map[group].dsts->size();
+    return 0;
+}
+
 Disposition
 MC_routing_module::handle_group_event(const Event& e)
 {
@@ -243,11 +263,6 @@ MC_routing_module::handle_group_event(const Event& e)
         }
     }
     
-    return CONTINUE;
-}
-Disposition 
-MC_routing_module::handle_linkpw_change(const Event& e)
-{
     return CONTINUE;
 }
 

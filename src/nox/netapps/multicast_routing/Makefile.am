@@ -11,8 +11,7 @@ endif # PY_ENABLED
 
 pkglib_LTLIBRARIES =		\
 	mc_routing_module.la	\
-	mcrouteinstaller.la	\
-	simplemcrouting.la
+	mcrouteinstaller.la	
 
 mc_routing_module_la_CPPFLAGS = 							\
 	$(AM_CPPFLAGS)								\
@@ -32,14 +31,6 @@ mcrouteinstaller_la_CPPFLAGS = 							\
 mcrouteinstaller_la_SOURCES = mcrouteinstaller.cc mcrouteinstaller.hh
 mcrouteinstaller_la_LDFLAGS = -module -export-dynamic
 
-simplemcrouting_la_CPPFLAGS = 							\
-	$(AM_CPPFLAGS)								\
-	-I$(srcdir)/../								\
-	-I$(top_srcdir)/src/nox/ 						\
-	-I$(top_srcdir)/src/nox/coreapps/ 					\
-	-D__COMPONENT_FACTORY_FUNCTION__=simplemcrouting_get_factory
-simplemcrouting_la_SOURCES = simplemcrouting.cc simplemcrouting.hh
-simplemcrouting_la_LDFLAGS = -module -export-dynamic
 
 NOX_RUNTIMEFILES = meta.json
 

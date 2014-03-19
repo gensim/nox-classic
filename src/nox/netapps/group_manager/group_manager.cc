@@ -517,7 +517,11 @@ Group_manager::delete_group(const Group& g)
         gr_map[g]->gm_v3_timer.cancel();
         gr_map[g]->gs_timer.cancel();
         gr_map[g]->gss_timer.cancel();
-        gr_map.erase(g);  
+        if(gr_map[g]->filter == IFM_EXCLUDE) {
+            gr_map[g]->filter = IFM_INCLUDE;
+            post(new Group_event(g.addr, g.dp, g.port, Group_event::TOINCLUDE));            
+        }
+        gr_map.erase(g);          
         post(new Group_event(g.addr, g.dp, g.port, Group_event::REMOVE));
         return true;
     }

@@ -7,7 +7,6 @@
 #include "openflow-action.hh"
 #include "hash_map.hh"
 #include "multicast_routing.hh"
-#include "route/routeinstaller.hh"
 
 namespace vigil 
 {
@@ -31,6 +30,10 @@ namespace vigil
     : public Component
   {
   public:
+    /** \brief Post flow record or not
+     */
+    bool post_flow_record;
+    
     /** Constructor.
      * @param c context as required by Component
      * @param node JSON object
@@ -59,65 +62,27 @@ namespace vigil
     */
     static void getInstance(const container::Context*, 
 			    vigil::mcrouteinstaller*& scpa);
-
-    /** Get multicast source-based path route.
-     * Note that a route for a list of destination is a tree.
-     * @param src source
-     * @param group group of destination
-     * @param route route to populate with source network termination
-     * @return if route is found
-     */
-    bool get_multicast_tree_path(const ipaddr& src, const ipaddr& group, network::route& route);
-
-    /** Install route, i.e., sending the route setup to a set of switches.
-     * Throws Route_install_event if desired.
-     * @param flow reference to flow to route
-     * @param route network route to be installed
-     * @param buffer_id id of buffer
-     * @param actions list of datapath id and action list pairs
-     * @param skipoutput list of datapath id to skip output action
-     * @param wildcards wildcard flags
-     * @param idletime idle timeout value
-     * @param hardtime hard timeout value
-     */
-    void install_route(const Flow& flow, network::route route, uint32_t buffer_id,
-		       hash_map<datapathid,ofp_action_list>& actions,
-		       list<datapathid>& skipoutput,
-		       uint32_t wildcards=0,
-		       uint16_t idletime=DEFAULT_FLOW_TIMEOUT, 
-		       uint16_t hardtime=0);
-
-    /** Install route, i.e., sending the route setup to a set of switches.
-     * @param flow reference to flow to route
-     * @param route network route to be installed
-     * @param buffer_id id of buffer
-     * @param wildcards wildcard flags
-     * @param idletime idle timeout value
-     * @param hardtime hard timeout value
-     */
-    void install_route(const Flow& flow, network::route route, uint32_t buffer_id,
-		       uint32_t wildcards=0, 
-		       uint16_t idletime=DEFAULT_FLOW_TIMEOUT, 
-		       uint16_t hardtime=0);
-
-    /** Install flow entry to switch.
-     * @param dpid datapathid of switch to send flow entry to
-     * @param flow reference to flow to route
-     * @param buffer_id id of buffer
-     * @param in_port input port
-     * @param act_list list of action to install on top of forwarding
-     * @param wildcards wildcard flags
-     * @param idletime idle timeout value
-     * @param hardtime hard timeout value
-     * @param cookie cookie for flow mod
-     */
-    void install_flow_entry(const datapathid& dpid,
-			    const Flow& flow, uint32_t buffer_id, uint16_t in_port,
-			    ofp_action_list act_list, uint32_t wildcards=0,
-			    uint16_t idletime=DEFAULT_FLOW_TIMEOUT, 
-			    uint16_t hardtime=0, uint64_t cookie=0);
+    
+    void install_route(const ipaddr& src, 
+                       const ipaddr& group,
+                       uint32_t buffer_id=-1,  
+                       uint16_t idletime=DEFAULT_FLOW_TIMEOUT,
+                       uint16_t hardtime=0);
 
   private:
+      
+    Disposition handle_group_event(const Event& e);
+    Disposition handle_pkt_in(const Event& e);
+    Disposition handle_flow_removed(const Event& e);
+    
+    bool get_multicast_tree_path(const ipaddr& src, const ipaddr& group, network::route& route);
+    
+    void real_install_route(const ipaddr& src, const ipaddr& group, network::route route, uint32_t buffer_id,
+                            hash_map<datapathid,ofp_action_list>& actions, bool removedmsg, uint16_t idletime, uint16_t hardtime);
+                            
+    void install_flow_entry(const datapathid& dpid, const ipaddr& src, const ipaddr& group, uint32_t buffer_id, 
+                            uint16_t in_port, ofp_action_list act_list, uint64_t cookie,
+                            bool removedmsg, uint16_t idletime, uint16_t hardtime);                           
       
     typedef struct {
         datapathid parent;
@@ -125,14 +90,24 @@ namespace vigil
         network::hop* nhop;
     } Node;
     typedef std::queue<Node> NodeQueue;
+    
+    typedef struct {
+        datapathid dpsrc;
+        uint64_t cookie;
+    } InstalledRule;
+    
+    typedef hash_map<ipaddr, InstalledRule> SrcInstalledRuleMap;
+    typedef hash_map<ipaddr, SrcInstalledRuleMap> GroupInstalledRuleMap;
+    
+    GroupInstalledRuleMap gir_map;
       
-    /** Reference to routeinstaller.
-     */
-    routeinstaller* ri;
-
     /** Reference to multicast routing module.
      */
     MC_routing_module* mcrouting;
+    
+    /** Buffer for openflow message.
+     */
+    boost::shared_array<uint8_t> of_raw;
 
   };
   

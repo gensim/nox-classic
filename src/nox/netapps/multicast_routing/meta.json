@@ -13,16 +13,7 @@
             "name": "mcrouteinstaller" ,
             "library": "mcrouteinstaller" ,
             "dependencies": [
-                "mc_routing_module",
-                "routeinstaller"
-            ]
-        },
-        {
-            "name": "simplemcrouting" ,
-            "library": "simplemcrouting" ,
-            "dependencies": [
-                "mcrouteinstaller",
-                "flowroute record"
+                "mc_routing_module"
             ]
         }
     ]

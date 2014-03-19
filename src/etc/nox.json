@@ -44,7 +44,7 @@
                 "noop",
                 "counter",
                 "packetdump",
-                "simplemcrouting",
+                "mcrouteinstaller",
                 "simplerouting",
                 "ctlflood",
                 "switch",
@@ -73,6 +73,7 @@
                 "authenticator"
                 ],
             "Flow_removed_event": [
+                "mcrouteinstaller",
                 "flowlog",
                 "dwh"
                 ],
@@ -126,7 +127,8 @@
                 "mc_routing_module"
                 ],    
             "Group_event": [
-                "mc_routing_module"
+                "mc_routing_module",
+                "mcrouteinstaller"
                 ]
 	        }
         }

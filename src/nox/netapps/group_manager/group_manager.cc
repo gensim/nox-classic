@@ -13,6 +13,7 @@
 #include "datapath-leave.hh"
 #include "port-status.hh"
 #include "packet-in.hh"
+#include "openflow-pack.hh"
 #include "vlog.hh"
 
 #include "netinet++/ethernetaddr.hh"
@@ -119,6 +120,8 @@ Disposition
 Group_manager::handle_datapath_join(const Event& e)
 {
     const Datapath_join_event& dj = assert_cast<const Datapath_join_event&>(e);
+    
+    install_igmp_rule(dj.datapath_id);
     for(std::vector<Port>::const_iterator p_iter = dj.ports.begin(); 
         p_iter != dj.ports.end(); ++p_iter) {
         if(p_iter->port_no <= 0 || p_iter->port_no >= OFPP_MAX) continue;
@@ -189,6 +192,29 @@ Group_manager::handle_igmp(const Event& e)
         }
     }
     return CONTINUE;
+}
+
+void 
+Group_manager::install_igmp_rule(const datapathid& dpid)
+{
+    ssize_t size = sizeof(ofp_flow_mod)+sizeof(of_action_output);
+    boost::shared_array<uint8_t> of_raw;
+    of_raw.reset(new uint8_t[size]);
+    of_flow_mod ofm;
+    ofm.header = openflow_pack::header(OFPT_FLOW_MOD, size);
+    ofm.match.dl_type = htons(ethernet::IP);
+    ofm.match.nw_proto = ip_::proto::IGMP;
+    ofm.match.wildcards = OFPFW_ALL & ~OFPFW_DL_TYPE & ~OFPFW_NW_PROTO;
+    ofm.command = OFPFC_ADD;
+    ofm.buffer_id = -1;
+    ofm.out_port = OFPP_NONE;
+    ofm.pack((ofp_flow_mod*) openflow_pack::get_pointer(of_raw));
+    of_action_output ofa_output;
+    ofa_output.len = sizeof(of_action_output);
+    ofa_output.port = OFPP_CONTROLLER;
+    ofa_output.max_len = 0xFFFF;
+    ofa_output.pack((ofp_action_output*)openflow_pack::get_pointer(of_raw,sizeof(ofp_flow_mod)));
+    send_openflow_command(dpid, of_raw, false);
 }
 
 void 

@@ -107,8 +107,9 @@ private:
     Disposition handle_igmp(const Event&);    
     Disposition handle_datapath_join(const Event&);       
     Disposition handle_port_status(const Event&);    
-    Disposition handle_link_event(const Event&);    
+    Disposition handle_link_event(const Event&);       
     
+    void install_igmp_rule(const datapathid& dpid);
     void process_record_source(const Group& g, SourceSet& ss, const uint8_t type, const igmp_compatibility_mode version);
     
     void start_group_member_timer(const Group& g, const igmp_compatibility_mode version);    

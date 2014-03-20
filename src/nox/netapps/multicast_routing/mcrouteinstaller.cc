@@ -272,9 +272,9 @@ namespace vigil
     of_flow_mod ofm;
     ofm.header = openflow_pack::header(OFPT_FLOW_MOD, size);
     ofm.match.in_port = in_port;
-    ofm.match.dl_type = htons(ethernet::IP);
-    ofm.match.nw_src = htonl((uint32_t)src);
-    ofm.match.nw_dst = htonl((uint32_t)group);
+    ofm.match.dl_type = ntohs(ethernet::IP);
+    ofm.match.nw_src = ntohl((uint32_t)src);
+    ofm.match.nw_dst = ntohl((uint32_t)group);
     ofm.match.nw_proto = ip_::proto::UDP;
     ofm.match.wildcards = OFPFW_ALL & ~OFPFW_IN_PORT & ~OFPFW_DL_TYPE &
                           ~OFPFW_NW_SRC_MASK & ~OFPFW_NW_DST_MASK & ~OFPFW_NW_PROTO;
@@ -283,7 +283,7 @@ namespace vigil
     ofm.flags = (removedmsg)?OFPFF_SEND_FLOW_REM:0;
     ofm.idle_timeout = idletime;
     ofm.hard_timeout = hardtime;
-    ofm.buffer_id = htonl(buffer_id);
+    ofm.buffer_id = buffer_id;
     ofm.out_port = OFPP_NONE;
     ofm.pack((ofp_flow_mod*) openflow_pack::get_pointer(of_raw));
     act_list.pack(openflow_pack::get_pointer(of_raw,sizeof(ofp_flow_mod)));

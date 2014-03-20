@@ -12,7 +12,6 @@
 #include "flow.hh"
 #include "datapath-join.hh"
 #include "group_manager/group-event.hh"
-#include "networkstate/linkpw-event.hh"
 #include "vlog.hh"
 #include "netinet++/ipaddr.hh"
 

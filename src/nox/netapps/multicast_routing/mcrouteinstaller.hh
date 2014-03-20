@@ -64,11 +64,20 @@ namespace vigil
 			    vigil::mcrouteinstaller*& scpa);
     
     void install_route(const ipaddr& src, 
-                       const ipaddr& group,
-                       uint32_t buffer_id=-1,  
+                       const ipaddr& group, 
                        uint16_t idletime=DEFAULT_FLOW_TIMEOUT,
                        uint16_t hardtime=0);
-
+                       
+    void remove_route(const ipaddr& src, 
+                      const ipaddr& group);
+                       
+    void install_block(const ipaddr& src, 
+                       const ipaddr& group,
+                       const datapathid& dpid,
+                       uint16_t in_port,
+                       uint16_t idletime=0, 
+                       uint16_t hardtime=DEFAULT_FLOW_TIMEOUT);
+                       
   private:
       
     Disposition handle_group_event(const Event& e);
@@ -77,12 +86,23 @@ namespace vigil
     
     bool get_multicast_tree_path(const ipaddr& src, const ipaddr& group, network::route& route);
     
-    void real_install_route(const ipaddr& src, const ipaddr& group, network::route route, uint32_t buffer_id,
-                            hash_map<datapathid,ofp_action_list>& actions, bool removedmsg, uint16_t idletime, uint16_t hardtime);
+    void real_install_route(const ipaddr& src, const ipaddr& group, network::route route, 
+                            hash_map<datapathid,ofp_action_list>& actions, bool removedmsg, 
+                            uint16_t idletime, uint16_t hardtime);
                             
-    void install_flow_entry(const datapathid& dpid, const ipaddr& src, const ipaddr& group, uint32_t buffer_id, 
+    void install_routing_flow_entry(const datapathid& dpid, const ipaddr& src, const ipaddr& group,  
                             uint16_t in_port, ofp_action_list act_list, uint64_t cookie,
-                            bool removedmsg, uint16_t idletime, uint16_t hardtime);                           
+                            bool removedmsg, uint16_t idletime, uint16_t hardtime);   
+                            
+    void remove_routing_flow_entry(const datapathid& dpid, const ipaddr& src, const ipaddr& group);
+                            
+    void install_blocking_flow_entry(const datapathid& dpid, const ipaddr& src, const ipaddr& group,
+                                     uint16_t in_port, uint16_t idletime, uint16_t hardtime); 
+                                     
+    void add_installed_rule(const ipaddr& src, const ipaddr& group, const datapathid& dpid);
+    void remove_installed_rule(const ipaddr& src, const ipaddr& group, const datapathid& dpid, uint64_t cookie);
+    void add_blocked_rule(const ipaddr& src, const ipaddr& group);
+    void remove_blocked_rule(const ipaddr& src, const ipaddr& group);
       
     typedef struct {
         datapathid parent;
@@ -99,8 +119,11 @@ namespace vigil
     typedef hash_map<ipaddr, InstalledRule> SrcInstalledRuleMap;
     typedef hash_map<ipaddr, SrcInstalledRuleMap> GroupInstalledRuleMap;
     
+    typedef hash_map<ipaddr, datapathid> SrcBlockedRuleMap;
+    typedef hash_map<ipaddr, SrcBlockedRuleMap> GroupBlockedRuleMap;
+    
     GroupInstalledRuleMap gir_map;
-      
+    GroupBlockedRuleMap gbr_map;  
     /** Reference to multicast routing module.
      */
     MC_routing_module* mcrouting;

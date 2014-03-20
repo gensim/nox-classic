@@ -6,7 +6,6 @@
 #include "hash_set.hh"
 #include "network_graph.hh"
 #include "routing/routing.hh"
-#include "topology/topology.hh"
 #include "hoststate/hostiptracker.hh"
 
 namespace vigil {

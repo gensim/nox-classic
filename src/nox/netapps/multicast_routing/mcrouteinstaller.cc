@@ -142,6 +142,7 @@ namespace vigil
   {      
     MC_routing_module::AdjListPtr tree;
     MC_routing_module::DstPortMapPtr dsts;
+    hash_set<datapathid> checked;
     network::hop* newhop = NULL;
     route.next_hops.clear();
     
@@ -154,6 +155,8 @@ namespace vigil
             for(MC_routing_module::AdjListNode::iterator it = (*tree)[u.id].begin();
                     it != (*tree)[u.id].end(); it++) {
                 if(it->first == u.parent) continue;
+                if(checked.find(it->first)!=checked.end())  continue;
+                checked.insert(it->first);
                 newhop = new network::hop(it->first, it->second.dstport);
                 u.nhop->next_hops.push_front(std::make_pair(it->second.srcport, newhop));
                 q.push((Node){u.id, it->first, newhop});                              

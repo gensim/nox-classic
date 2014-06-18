@@ -6,11 +6,12 @@
 #include "hash_set.hh"
 #include "network_graph.hh"
 #include "routing/routing.hh"
+#include "openflow-action.hh"
 #include "hoststate/hostiptracker.hh"
 
 namespace vigil {
 namespace applications {
-
+using namespace vigil;
 class MC_routing_module : public container::Component 
 {
 public:  
@@ -34,16 +35,17 @@ public:
     void install();
 
     static void getInstance(const container::Context* c, MC_routing_module*& component);
-    
-    bool get_source_location(const ipaddr& src, network::route& route);
+   
+    bool get_multicast_tree_path(const ipaddr& src, const ipaddr& group, 
+                                 network::route& route, hash_map<datapathid,ofp_action_list>* oal=NULL);
     
     bool get_multicast_tree(const ipaddr& src, const ipaddr& group, 
-                            AdjListPtr& tree, DstPortMapPtr& dsts);
+                            AdjListPtr& tree, DstPortMapPtr& dsts, network::route& route);
     
     bool get_multicast_source_tree(const ipaddr& src, const ipaddr& group, 
                                    AdjListPtr& tree, DstPortMapPtr& dsts);
     
-    bool get_multicast_shared_tree(const ipaddr& src, const ipaddr& group, 
+    bool get_multicast_shared_tree(const datapathid& src, const ipaddr& group, 
                                    AdjListPtr& tree, DstPortMapPtr& dsts);
                                    
     bool has_multicast_route(ipaddr group, ipaddr src);
@@ -181,6 +183,13 @@ private:
         DpMap dps;
     };
     
+    typedef struct {
+        datapathid parent;
+        datapathid id;
+        network::hop* nhop;
+    } Node;
+    typedef std::queue<Node> NodeQueue;
+    
     SrcGroupMap sg_map;
     MulticastTreeMap mt_map;
     Routing_module *routing;
@@ -210,7 +219,7 @@ private:
     AdjListPtr minimum_spanning_tree(const AdjListPtr& subgraph);
     AdjListPtr reverse_mintree(const AdjListPtr& tree, const RouteDirection& rd);
     void fixup_leaves(AdjListPtr& mctree, const AdjListPtr& mintree, const DstSetPtr& dsp);
-    void print_graph(const AdjListPtr& graph);
+    void print_graph(const AdjListPtr& graph, int reason=0);
 };
 
 }

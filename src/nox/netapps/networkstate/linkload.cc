@@ -65,11 +65,11 @@ namespace vigil
  
     if (tx)
       return (float) ((double) ll.txLoad*8)/ \
-	(((double) dpmem->get_link_speed(dpid, port))*1000*\
+	(((double) dpmem->get_link_speed(dpid, port))*1024*1024*1000*\
 	 ((double) ll.interval));
     else
       return (float) ((double) ll.rxLoad*8)/ \
-	(((double) dpmem->get_link_speed(dpid, port))*1000*\
+	(((double) dpmem->get_link_speed(dpid, port))*1024*1024*1000*\
 	 ((double) ll.interval));
   }
 

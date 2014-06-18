@@ -30,10 +30,6 @@ namespace vigil
     : public Component
   {
   public:
-    /** \brief Post flow record or not
-     */
-    bool post_flow_record;
-    
     /** Constructor.
      * @param c context as required by Component
      * @param node JSON object
@@ -63,20 +59,26 @@ namespace vigil
     static void getInstance(const container::Context*, 
 			    vigil::mcrouteinstaller*& scpa);
     
-    void install_route(const ipaddr& src, 
-                       const ipaddr& group, 
-                       uint16_t idletime=DEFAULT_FLOW_TIMEOUT,
-                       uint16_t hardtime=0);
+    void install_route(const ipaddr src, 
+                       const ipaddr group, 
+                       network::route& rte, 
+                       hash_map<datapathid,ofp_action_list>& act_list, 
+                       uint32_t buffer_id=-1, 
+                       uint16_t idletime=DEFAULT_FLOW_TIMEOUT, 
+                       uint16_t hardtime=0);                    
+                        
+    void remove_route(const ipaddr src, 
+                      const ipaddr group);
                        
-    void remove_route(const ipaddr& src, 
-                      const ipaddr& group);
-                       
-    void install_block(const ipaddr& src, 
-                       const ipaddr& group,
+    void install_block(const ipaddr src, 
+                       const ipaddr group,
                        const datapathid& dpid,
                        uint16_t in_port,
-                       uint16_t idletime=0, 
-                       uint16_t hardtime=DEFAULT_FLOW_TIMEOUT);
+                       uint16_t idletime=DEFAULT_FLOW_TIMEOUT, 
+                       uint16_t hardtime=0);
+                       
+    void remove_block(const ipaddr src,
+                      const ipaddr group);
                        
   private:
       
@@ -84,45 +86,38 @@ namespace vigil
     Disposition handle_pkt_in(const Event& e);
     Disposition handle_flow_removed(const Event& e);
     
-    bool get_multicast_tree_path(const ipaddr& src, const ipaddr& group, network::route& route);
+    void reset_route(const ipaddr& src, const ipaddr& group, uint32_t buffer_id=-1);
     
-    void real_install_route(const ipaddr& src, const ipaddr& group, network::route route, 
+    void real_install_route(const ipaddr src, const ipaddr group, network::route route, uint32_t buffer_id,
                             hash_map<datapathid,ofp_action_list>& actions, bool removedmsg, 
                             uint16_t idletime, uint16_t hardtime);
-                            
-    void install_routing_flow_entry(const datapathid& dpid, const ipaddr& src, const ipaddr& group,  
-                            uint16_t in_port, ofp_action_list act_list, uint64_t cookie,
-                            bool removedmsg, uint16_t idletime, uint16_t hardtime);   
-                            
-    void remove_routing_flow_entry(const datapathid& dpid, const ipaddr& src, const ipaddr& group);
-                            
-    void install_blocking_flow_entry(const datapathid& dpid, const ipaddr& src, const ipaddr& group,
-                                     uint16_t in_port, uint16_t idletime, uint16_t hardtime); 
-                                     
-    void add_installed_rule(const ipaddr& src, const ipaddr& group, const datapathid& dpid);
-    void remove_installed_rule(const ipaddr& src, const ipaddr& group, const datapathid& dpid, uint64_t cookie);
-    void add_blocked_rule(const ipaddr& src, const ipaddr& group);
-    void remove_blocked_rule(const ipaddr& src, const ipaddr& group);
-      
-    typedef struct {
-        datapathid parent;
-        datapathid id;
-        network::hop* nhop;
-    } Node;
-    typedef std::queue<Node> NodeQueue;
+                             
+    bool add_routing_table_entry(const ipaddr src, const ipaddr group, network::route route, hash_map<datapathid,ofp_action_list>& act_list);
+    bool delete_routed_table_entry(const ipaddr src, const ipaddr group, datapathid& dpid, uint64_t& cookie);
+    bool add_blocking_table_entry(const ipaddr src, const ipaddr group, const datapathid dpid);
+    bool delete_blocked_table_entry(const ipaddr src, const ipaddr group,  datapathid& dpid);
+    
+    void install_routing_flow_entry(const datapathid dpid, const ipaddr src, const ipaddr group, uint16_t in_port, ofp_action_list act_list, uint32_t buffer_id, uint64_t cookie, bool removedmsg, uint16_t idletime, uint16_t hardtime);                               
+    void remove_routing_flow_entry(const datapathid dpid, const ipaddr src, const ipaddr group);                            
+    void install_blocking_flow_entry(const datapathid dpid, const ipaddr src, const ipaddr group, uint16_t in_port, uint16_t idletime, uint16_t hardtime);                                      
+    void remove_blocking_flow_entry(const datapathid dpid, const ipaddr src, const ipaddr group);
+    
+    void forward_routed_flow(const datapathid dpid, const ipaddr src, const ipaddr group, uint16_t in_port, ofp_action_list act_list, uint32_t buffer_id);
+    void forward_routed_flow(const datapathid dpid, const ipaddr src, const ipaddr group, uint16_t in_port, ofp_action_list act_list, const Buffer& buf);
     
     typedef struct {
         datapathid dpsrc;
         uint64_t cookie;
-    } InstalledRule;
+        hash_map<datapathid,ofp_action_list> act;
+    } RoutedRule;
     
-    typedef hash_map<ipaddr, InstalledRule> SrcInstalledRuleMap;
-    typedef hash_map<ipaddr, SrcInstalledRuleMap> GroupInstalledRuleMap;
+    typedef hash_map<ipaddr, RoutedRule> SrcRoutedRuleMap;
+    typedef hash_map<ipaddr, SrcRoutedRuleMap> GroupRoutedRuleMap;
     
     typedef hash_map<ipaddr, datapathid> SrcBlockedRuleMap;
     typedef hash_map<ipaddr, SrcBlockedRuleMap> GroupBlockedRuleMap;
     
-    GroupInstalledRuleMap gir_map;
+    GroupRoutedRuleMap grr_map;
     GroupBlockedRuleMap gbr_map;  
     /** Reference to multicast routing module.
      */

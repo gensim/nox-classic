@@ -145,7 +145,7 @@ namespace vigil
     if(tx_load.interval == 0) tx_ratio = 0;
     else tx_ratio = lload->get_link_load_ratio(it->first.dpsrc, it->first.sport);
     if(rx_load.interval == 0) rx_ratio = 0;
-    else rx_ratio = lload->get_link_load_ratio(it->first.dpdst, it->first.dport);
+    else rx_ratio = lload->get_link_load_ratio(it->first.dpdst, it->first.dport, false);
     ratio = (tx_ratio >= rx_ratio) ? tx_ratio : rx_ratio ;
 
     old_phase = it->second.phase;

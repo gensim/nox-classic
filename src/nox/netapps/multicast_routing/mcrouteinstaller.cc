@@ -52,28 +52,26 @@ namespace vigil
         pie.flow.nw_proto != ip_::proto::UDP ||
         src == (uint32_t)0 || group == (uint32_t)0 ||
         src.isMulticast() || !group.isMulticast())
-      return CONTINUE;
-    
-    if(grr_map.find(group) != grr_map.end() &&
-       grr_map[group].find(src) != grr_map[group].end()) { 
-        if(grr_map[group][src].act.find(pie.datapath_id) != grr_map[group][src].act.end()) { 
-            if(pie.buffer_id!=-1)
-                forward_routed_flow(pie.datapath_id, src, group, pie.in_port,
-                                    grr_map[group][src].act[pie.datapath_id], pie.buffer_id);
-            else
-                forward_routed_flow(pie.datapath_id, src, group, pie.in_port,
-                                    grr_map[group][src].act[pie.datapath_id], *pie.get_buffer());
-        } else {
-            VLOG_ERR(lg, "Routed flow src=%s group=%s, but no dpid=%"PRIx64"",
-                  src.string().c_str(), group.string().c_str(), pie.datapath_id.as_host());
-        }
-        return CONTINUE;
-    }
+      return CONTINUE;   
     
     if(mcrouting->has_multicast_route(group, src) ||
        mcrouting->get_multicast_dst_size(group) != 0) {
-        remove_block(src, group);
-        reset_route(src, group, pie.buffer_id);
+        if(grr_map.find(group) != grr_map.end() &&
+            grr_map[group].find(src) != grr_map[group].end()) { 
+            if(grr_map[group][src].act.find(pie.datapath_id) != grr_map[group][src].act.end()) { 
+                if(pie.buffer_id!=-1)
+                    forward_routed_flow(pie.datapath_id, src, group, pie.in_port,
+                                        grr_map[group][src].act[pie.datapath_id], pie.buffer_id);
+                else
+                    forward_routed_flow(pie.datapath_id, src, group, pie.in_port,
+                                        grr_map[group][src].act[pie.datapath_id], *pie.get_buffer());
+            } else {
+                VLOG_ERR(lg, "Routed flow src=%s group=%s, but no dpid=%"PRIx64"",
+                    src.string().c_str(), group.string().c_str(), pie.datapath_id.as_host());
+            }
+            return CONTINUE;
+        }
+        install_route(src, group, pie.buffer_id);
     } else {
         if(gbr_map.find(group) != gbr_map.end() &&
             gbr_map[group].find(src) != gbr_map[group].end()) 
@@ -103,7 +101,7 @@ namespace vigil
         return CONTINUE;
     }
     
-    hash_map<ipaddr,bool> route_reset;
+    hash_set<ipaddr> route_install;
     hash_set<ipaddr> route_remove;
     
     if(gbr_map.find(group) != gbr_map.end()) {
@@ -112,14 +110,14 @@ namespace vigil
                 it != gbr_map[group].end(); it++) {
                 if(mcrouting->has_multicast_route(group, it->first) || 
                     mcrouting->get_multicast_dst_size(group) != 0) { 
-                    route_reset[it->first] = false;
+                    route_install.insert(it->first);
                 }
             }
         } else {
             if(gbr_map[group].find(src) != gbr_map[group].end()) {
                 if(mcrouting->has_multicast_route(group, src) ||
                     mcrouting->get_multicast_dst_size(group) != 0) {
-                    route_reset[src] = false;
+                    route_install.insert(src);
                 } 
             }
         }
@@ -131,7 +129,7 @@ namespace vigil
                 it != grr_map[group].end(); it++) {
                 if(mcrouting->has_multicast_route(group, it->first) || 
                     mcrouting->get_multicast_dst_size(group) != 0) {                
-                    route_reset[it->first] = true;
+                    route_install.insert(it->first);
                 } else {
                     route_remove.insert(it->first);
                 }
@@ -140,7 +138,7 @@ namespace vigil
             if(grr_map[group].find(src) != grr_map[group].end()) {
                 if(mcrouting->has_multicast_route(group, src) ||
                     mcrouting->get_multicast_dst_size(group) != 0) {
-                    route_reset[src] = true;
+                    route_install.insert(src);
                 } else {
                     route_remove.insert(src);
                 }
@@ -148,10 +146,9 @@ namespace vigil
         }
     }
     
-    for(hash_map<ipaddr,bool>::iterator it = route_reset.begin();
-        it != route_reset.end(); it++) {
-        if(!it->second) remove_block(it->first, group);
-        reset_route(it->first, group);
+    for(hash_set<ipaddr>::iterator it = route_install.begin();
+        it != route_install.end(); it++) {
+        install_route(*it, group);
     }
     for(hash_set<ipaddr>::iterator it = route_remove.begin();
         it != route_remove.end(); it++) {
@@ -191,27 +188,17 @@ namespace vigil
     
     return CONTINUE;    
   }
-  
-  void mcrouteinstaller::reset_route(const ipaddr& src, 
-                                        const ipaddr& group,
-                                        uint32_t buffer_id)
-  {
-    VLOG_DBG(lg, "reset route src=%s group=%s", src.string().c_str(), group.string().c_str());
-    network::route rte(datapathid(), OFPP_NONE);   
-    hash_map<datapathid,ofp_action_list> act_list;    
-    if(!mcrouting->get_multicast_tree_path(src, group, rte, &act_list)) return;
-    
-    install_route(src, group, rte, act_list, buffer_id); 
-  }
-  
+ 
   void mcrouteinstaller::install_route(const ipaddr src, 
                                        const ipaddr group,
-                                       network::route& rte,
-                                       hash_map<datapathid,ofp_action_list>& act_list,
                                        uint32_t buffer_id,
                                        uint16_t idletime,
                                        uint16_t hardtime)
   {
+    network::route rte(datapathid(), OFPP_NONE);   
+    hash_map<datapathid,ofp_action_list> act_list;    
+    if(!mcrouting->get_multicast_tree_path(src, group, rte, &act_list)) return;
+    
     if(add_routing_table_entry(src, group, rte, act_list))
       real_install_route(src, group, rte, buffer_id, act_list, true, idletime, hardtime);   
   }
@@ -221,6 +208,7 @@ namespace vigil
   {
     datapathid dpid;
     uint64_t cookie;
+    
     if(delete_routed_table_entry(src, group, dpid, cookie)) {
       remove_routing_flow_entry(dpid, src, group);
     }
@@ -233,7 +221,6 @@ namespace vigil
                                        uint16_t idletime, 
                                        uint16_t hardtime)
   {
-    
     if(add_blocking_table_entry(src, group, dpid))
       install_blocking_flow_entry(dpid, src, group, in_port, idletime, hardtime);         
   }
@@ -243,7 +230,6 @@ namespace vigil
   {
     datapathid dpid;
     if(delete_blocked_table_entry(src, group, dpid)){
-        VLOG_DBG(lg, "before remove_routing_flow_entry src=%s group=%s", src.string().c_str(), group.string().c_str());
       remove_blocking_flow_entry(dpid, src, group);
     }
   }
@@ -346,9 +332,12 @@ namespace vigil
   bool mcrouteinstaller::add_blocking_table_entry(const ipaddr src, const ipaddr group, const datapathid dpid)
   {
     if(gbr_map.find(group) != gbr_map.end() &&
-       gbr_map[group].find(src) != gbr_map[group].end() &&
-       gbr_map[group][src] != dpid) 
-        return false;
+       gbr_map[group].find(src) != gbr_map[group].end()) {
+        if(gbr_map[group][src] == dpid)
+            return false;
+        gbr_map[group][src] = dpid;
+        return true;
+    }
         
     if(gbr_map.find(group) == gbr_map.end()) 
         gbr_map[group] = SrcBlockedRuleMap();

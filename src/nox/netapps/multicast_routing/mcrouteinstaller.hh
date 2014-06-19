@@ -60,9 +60,7 @@ namespace vigil
 			    vigil::mcrouteinstaller*& scpa);
     
     void install_route(const ipaddr src, 
-                       const ipaddr group, 
-                       network::route& rte, 
-                       hash_map<datapathid,ofp_action_list>& act_list, 
+                       const ipaddr group,
                        uint32_t buffer_id=-1, 
                        uint16_t idletime=DEFAULT_FLOW_TIMEOUT, 
                        uint16_t hardtime=0);                    
@@ -85,8 +83,6 @@ namespace vigil
     Disposition handle_group_event(const Event& e);
     Disposition handle_pkt_in(const Event& e);
     Disposition handle_flow_removed(const Event& e);
-    
-    void reset_route(const ipaddr& src, const ipaddr& group, uint32_t buffer_id=-1);
     
     void real_install_route(const ipaddr src, const ipaddr group, network::route route, uint32_t buffer_id,
                             hash_map<datapathid,ofp_action_list>& actions, bool removedmsg, 

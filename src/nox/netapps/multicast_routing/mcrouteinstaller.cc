@@ -128,7 +128,7 @@ namespace vigil
             for(SrcRoutedRuleMap::iterator it = grr_map[group].begin();
                 it != grr_map[group].end(); it++) {
                 if(mcrouting->has_multicast_route(group, it->first) || 
-                    mcrouting->get_multicast_dst_size(group) != 0) {                
+                    mcrouting->get_multicast_dst_size(group) != 0) {
                     route_install.insert(it->first);
                 } else {
                     route_remove.insert(it->first);
@@ -148,6 +148,8 @@ namespace vigil
     
     for(hash_set<ipaddr>::iterator it = route_install.begin();
         it != route_install.end(); it++) {
+        datapathid dpid;
+        delete_blocked_table_entry(*it, group, dpid);
         install_route(*it, group);
     }
     for(hash_set<ipaddr>::iterator it = route_remove.begin();
@@ -207,7 +209,7 @@ namespace vigil
                                       const ipaddr group)
   {
     datapathid dpid;
-    uint64_t cookie;
+    uint64_t cookie=0;
     
     if(delete_routed_table_entry(src, group, dpid, cookie)) {
       remove_routing_flow_entry(dpid, src, group);

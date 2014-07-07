@@ -416,6 +416,7 @@ MC_routing_module::remove_dst_port(DstPortMapPtr& dsts, const datapathid& dpid, 
         dsts->erase(dpid);
         bNeedUpdated = true;
     }
+    
     return bNeedUpdated;
 }
 
@@ -470,7 +471,7 @@ MC_routing_module::update_multicast_shared_tree(AdjListPtr& mctree, const DstPor
     DstSetPtr dsp = (DstSetPtr) new DstSet;
     for(DstPortMap::iterator it = dsts->begin(); it != dsts->end(); it++) 
         dsp->insert(it->first);
-        
+            
     return kmb_approximation_algorithm(mctree, dsp);
 }
 
@@ -484,7 +485,8 @@ MC_routing_module::kmb_approximation_algorithm(AdjListPtr& mctree, const DstSetP
     if(!complete_subgraph(subgraph, dsp, rd)) return false;
     mintree = minimum_spanning_tree(subgraph);
     subgraph = reverse_mintree(mintree, rd); 
-    fixup_leaves(mctree, subgraph, dsp);
+    mintree = minimum_spanning_tree(subgraph);
+    fixup_leaves(mctree, mintree, dsp);
     for(DstSet::iterator it = dsp->begin(); it != dsp->end(); it++) {
         if(mctree->find(*it) == mctree->end()) {
             (*mctree)[*it] = AdjListNode();

@@ -67,7 +67,8 @@
                 ],
             "Linkpw_event": [
                 "routing_module",
-                "mc_routing_module"
+                "mc_routing_module",
+                "mcrouteinstaller"
                 ],
             "Flow_mod_event": [
                 "authenticator"

@@ -80,18 +80,21 @@ namespace vigil
                        
   private:
       
+    typedef MC_routing_module::Src2TreeListPtr Src2TreeListPtr;  
+      
     Disposition handle_group_event(const Event& e);
     Disposition handle_pkt_in(const Event& e);
     Disposition handle_flow_removed(const Event& e);
+    Disposition handle_linkpw_change(const Event& e);
     
     void real_install_route(const ipaddr src, const ipaddr group, network::route route, uint32_t buffer_id,
                             hash_map<datapathid,ofp_action_list>& actions, bool removedmsg, 
                             uint16_t idletime, uint16_t hardtime);
                              
-    bool add_routing_table_entry(const ipaddr src, const ipaddr group, network::route route, hash_map<datapathid,ofp_action_list>& act_list);
+    bool add_routing_table_entry(const ipaddr src, const ipaddr group, network::route route, Src2TreeListPtr& stot, hash_map<datapathid,ofp_action_list>& act_list);
     bool delete_routed_table_entry(const ipaddr src, const ipaddr group, datapathid& dpid, uint64_t& cookie);
     bool add_blocking_table_entry(const ipaddr src, const ipaddr group, const datapathid dpid);
-    bool delete_blocked_table_entry(const ipaddr src, const ipaddr group,  datapathid& dpid);
+    bool delete_blocked_table_entry(const ipaddr src, const ipaddr group, datapathid& dpid);
     
     void install_routing_flow_entry(const datapathid dpid, const ipaddr src, const ipaddr group, uint16_t in_port, ofp_action_list act_list, uint32_t buffer_id, uint64_t cookie, bool removedmsg, uint16_t idletime, uint16_t hardtime);                               
     void remove_routing_flow_entry(const datapathid dpid, const ipaddr src, const ipaddr group);                            
@@ -100,11 +103,12 @@ namespace vigil
     
     void forward_routed_flow(const datapathid dpid, const ipaddr src, const ipaddr group, uint16_t in_port, ofp_action_list act_list, uint32_t buffer_id);
     void forward_routed_flow(const datapathid dpid, const ipaddr src, const ipaddr group, uint16_t in_port, ofp_action_list act_list, const Buffer& buf);
-    
+   
     typedef struct {
         datapathid dpsrc;
         uint64_t cookie;
         hash_map<datapathid,ofp_action_list> act;
+        Src2TreeListPtr stot;
     } RoutedRule;
     
     typedef hash_map<ipaddr, RoutedRule> SrcRoutedRuleMap;

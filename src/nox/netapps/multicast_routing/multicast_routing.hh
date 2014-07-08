@@ -25,7 +25,15 @@ public:
     typedef boost::shared_ptr<AdjList> AdjListPtr; 
     typedef hash_set<uint16_t> PortSet;
     typedef hash_map<datapathid, PortSet> DstPortMap;
-    typedef boost::shared_ptr<DstPortMap> DstPortMapPtr; 
+    typedef boost::shared_ptr<DstPortMap> DstPortMapPtr;
+    
+    typedef struct {
+        datapathid next;
+        uint16_t outport;
+        bool last;
+    } NextHop;    
+    typedef hash_map<datapathid, NextHop> Src2TreeList;
+    typedef boost::shared_ptr<Src2TreeList> Src2TreeListPtr;
     
     MC_routing_module(const container::Context* c, const json_object*); 
     ~MC_routing_module() {}
@@ -37,18 +45,23 @@ public:
     static void getInstance(const container::Context* c, MC_routing_module*& component);
    
     bool get_multicast_tree_path(const ipaddr& src, const ipaddr& group, 
-                                 network::route& route, hash_map<datapathid,ofp_action_list>* oal=NULL);
+                                 network::route& route, Src2TreeListPtr& stot,
+                                 hash_map<datapathid,ofp_action_list>* oal=NULL);
     
+    bool get_route_source_tree(const ipaddr& saddr, const AdjListPtr& mctree,
+                               network::route& route, Src2TreeListPtr& stot);                                
+                                 
     bool get_multicast_tree(const ipaddr& src, const ipaddr& group, 
-                            AdjListPtr& tree, DstPortMapPtr& dsts, network::route& route);
+                            AdjListPtr& tree, DstPortMapPtr& dsts);
     
     bool get_multicast_source_tree(const ipaddr& src, const ipaddr& group, 
                                    AdjListPtr& tree, DstPortMapPtr& dsts);
     
-    bool get_multicast_shared_tree(const datapathid& src, const ipaddr& group, 
-                                   AdjListPtr& tree, DstPortMapPtr& dsts);
-                                   
+    bool get_multicast_shared_tree(const ipaddr& group, AdjListPtr& tree, DstPortMapPtr& dsts);
+    
     bool has_multicast_route(ipaddr group, ipaddr src);
+    
+    size_t get_multicast_dst_size(ipaddr group, ipaddr src);
     
     bool has_multicast_route(ipaddr group);
 
@@ -73,7 +86,6 @@ private:
     typedef struct { 
         DstPortMapPtr dsts;
         AdjListPtr tree;
-        bool updated;
     } MulticastSrc;
     
     typedef hash_map<ipaddr, MulticastSrc> MulticastSrcMap;
@@ -82,7 +94,6 @@ private:
         MulticastSrcMapPtr srcs;
         DstPortMapPtr dsts;
         AdjListPtr tree;
-        bool updated;
     } MulticastRoute;      
     
     typedef hash_map<ipaddr, MulticastRoute> MulticastTreeMap; 
@@ -190,12 +201,14 @@ private:
     } Node;
     typedef std::queue<Node> NodeQueue;
     
-    SrcGroupMap sg_map;
     MulticastTreeMap mt_map;
     Routing_module *routing;
     hostiptracker *hit;   
     
     Disposition handle_group_event(const Event& e);
+    Disposition handle_linkpw_change(const Event& e);
+    
+    bool is_link_changed(const AdjListPtr& tree, const Linkpw_event& le);
     
     bool get_multicast_route(const ipaddr g, DstPortMapPtr& dsts, AdjListPtr& tree, MulticastSrcMapPtr& srcs);
     void add_multicast_route(const ipaddr g);
@@ -206,9 +219,6 @@ private:
     
     bool add_dst_port(DstPortMapPtr& dsts, const datapathid& dpid, const uint16_t port) const;
     bool remove_dst_port(DstPortMapPtr& dsts, const datapathid& dpid, const uint16_t port) const;
-    
-    void add_source_group(const ipaddr g, const ipaddr src, const MulticastSrcMapPtr& srcs);
-    void remove_source_group(const ipaddr g, const ipaddr src, const MulticastSrcMapPtr& srcs);
     
     bool update_multicast_source_tree(AdjListPtr& mctree, const DstPortMapPtr& dsts, const DstPortMapPtr& sdsts, const ipaddr& src);
     bool update_multicast_shared_tree(AdjListPtr& mctree, const DstPortMapPtr& dsts);

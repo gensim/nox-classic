@@ -54,24 +54,28 @@ bool
 MC_routing_module::get_multicast_tree_path(const ipaddr& src,
                                            const ipaddr& group, 
                                            network::route& route,
+                                           Src2TreeListPtr& stot,
                                            hash_map<datapathid,ofp_action_list>* oal)
 {      
     AdjListPtr tree;
     DstPortMapPtr dsts;
-    hash_set<datapathid> checked;
-    network::hop* newhop = NULL;
-    route.next_hops.clear();
+    hash_set<datapathid> checked;    
+    route.next_hops.clear();   
     
-    hostiptracker::location sloc = hit->get_latest_location(src);    
-    if(sloc.dpid.empty()) return false;
-    
-    route.in_switch_port.dpid = sloc.dpid;
-    route.in_switch_port.port = sloc.port;
-    
-    if(get_multicast_tree(src, group, tree, dsts, route)) {
+    if(get_multicast_tree(src, group, tree, dsts) && 
+        get_route_source_tree(src, tree, route, stot)) {
+        
         if(oal) oal->clear();
+        
+        network::hop* nhop = &route;
+        while(nhop->next_hops.size()>0) {
+            if(oal) (*oal)[nhop->in_switch_port.dpid] = ofp_action_list();
+            nhop = nhop->next_hops.front().second;
+        }            
+    
+        network::hop* newhop = NULL;
         NodeQueue q;
-        q.push((Node){datapathid(), route.in_switch_port.dpid, &route});
+        q.push((Node){datapathid(), nhop->in_switch_port.dpid, nhop});
         while(q.size()!=0) {
             Node u = q.front();
             if(oal) (*oal)[u.id] = ofp_action_list();
@@ -102,18 +106,61 @@ bool
 MC_routing_module::get_multicast_tree(const ipaddr& src, 
                                       const ipaddr& group,
                                       AdjListPtr& tree,
-                                      DstPortMapPtr& dsts,
-                                      network::route& route) 
+                                      DstPortMapPtr& dsts) 
 {
     VLOG_DBG(log, "Get multicast tree");
     if(get_multicast_source_tree(src, group, tree, dsts)) {
         print_graph(tree, 1);
         return true;
-    } else if(get_multicast_shared_tree(route.in_switch_port.dpid, group, tree, dsts)) {
+    } else if(get_multicast_shared_tree(group, tree, dsts)) {
         print_graph(tree, 2);
         return true;
     }
     return false;
+}
+
+bool
+MC_routing_module::get_route_source_tree(const ipaddr& saddr,
+                                       const AdjListPtr& mctree,
+                                       network::route& route,
+                                       Src2TreeListPtr& stot)
+{
+    hostiptracker::location sloc = hit->get_latest_location(saddr);    
+    if(sloc.dpid.empty()) return false;
+    
+    route.in_switch_port.dpid = sloc.dpid;
+    route.in_switch_port.port = sloc.port;
+    
+    datapathid src = sloc.dpid;
+    datapathid dst;
+    Linkweight max = (Linkweight){Linkweight::MAX_INT, Linkweight::MAX_INT};
+    for(AdjList::iterator it = mctree->begin(); it != mctree->end(); it++) {
+        Routing_module::RoutePtr rte;
+        bool bIsOK = routing->get_route((RouteId){src, it->first}, rte);   
+        if(bIsOK && max > rte->weight) {
+            dst = it->first;
+            max = rte->weight;
+        }
+    }
+    
+    if(dst.empty()) return false;   
+    
+    stot = (Src2TreeListPtr) new Src2TreeList;
+    network::hop* rp = &route;
+    Routing_module::RoutePtr rte;
+    routing->get_route((RouteId){src, dst}, rte);    
+    datapathid dpsrc = src, dpdst;
+    for(std::list<Routing_module::Link>::iterator l_it = rte->path.begin(); l_it != rte->path.end(); l_it++) {
+        dpdst = l_it->dst;
+        bool last = (mctree->find(dpdst) != mctree->end());
+        (*stot)[dpsrc] = (NextHop){dpdst, l_it->outport, last};
+        network::hop* newhop = new network::hop(dpdst, l_it->inport);
+        rp->next_hops.push_front(std::make_pair(l_it->outport, newhop)); 
+        rp = newhop;
+        dpsrc = dpdst;
+    }
+    
+    return true;
 }
 
 bool
@@ -123,8 +170,7 @@ MC_routing_module::get_multicast_source_tree(const ipaddr& src,
                                              DstPortMapPtr& dsts) 
 {    
     if(mt_map.find(group) == mt_map.end() ||
-        mt_map[group].srcs->find(src) == mt_map[group].srcs->end() ||
-        !((*(mt_map[group].srcs))[src].updated)) {
+        mt_map[group].srcs->find(src) == mt_map[group].srcs->end() ) {
         return false;
     }
     VLOG_DBG(log, "Get multicast source tree %s %s", group.string().c_str(), src.string().c_str());
@@ -142,37 +188,19 @@ MC_routing_module::get_multicast_source_tree(const ipaddr& src,
             (*dsts)[it->first] = PortSet();
         (*dsts)[it->first].insert(it->second.begin(), it->second.end());
     }
-    (*(mt_map[group].srcs))[src].updated = false;
+    
     return true;
 }
 
 bool 
-MC_routing_module::get_multicast_shared_tree(const datapathid& src,
-                                             const ipaddr& group, 
+MC_routing_module::get_multicast_shared_tree(const ipaddr& group, 
                                              AdjListPtr& tree,
                                              DstPortMapPtr& dsts)
 {
-    if(mt_map.find(group) == mt_map.end() ||
-        !mt_map[group].updated) {
+    if(mt_map.find(group) == mt_map.end()) {
         return false;
     }    
-    
-    tree = (AdjListPtr) new AdjList;
-    datapathid dst;
-    Linkweight max = (Linkweight){Linkweight::MAX_INT, Linkweight::MAX_INT};
-    for(AdjList::iterator it = mt_map[group].tree->begin();
-        it != mt_map[group].tree->end(); it++) {
-        (*tree)[it->first] = it->second;
-        Routing_module::RoutePtr route;
-        bool bIsOK = routing->get_route((RouteId){src, it->first}, route);   
-        if(bIsOK && max > route->weight) {
-            dst = it->first;
-            max = route->weight;
-        }
-    }
-    
-    if(dst.empty()) return false;
-      
+    tree = mt_map[group].tree;
     dsts = (DstPortMapPtr) new DstPortMap;
     for(DstPortMap::iterator it = mt_map[group].dsts->begin();
         it != mt_map[group].dsts->end(); it++) {
@@ -181,30 +209,6 @@ MC_routing_module::get_multicast_shared_tree(const datapathid& src,
         (*dsts)[it->first].insert(it->second.begin(), it->second.end());
     }
     
-    Routing_module::RoutePtr route;
-    routing->get_route((RouteId){src, dst}, route);    
-    datapathid dpsrc = route->id.src, dpdst;
-    for(std::list<Routing_module::Link>::iterator l_it = route->path.begin(); l_it != route->path.end(); l_it++) {
-        dpdst = l_it->dst;
-        AdjList::iterator al_it = tree->find(dpsrc);
-        if(al_it == tree->end()) {
-            (*tree)[dpsrc][dpdst] = (Link){l_it->outport, l_it->inport, l_it->weight};
-            (*tree)[dpdst][dpsrc] = (Link){l_it->inport, l_it->outport, l_it->weight};
-        } else {
-            AdjListNode::iterator aln_it = (*tree)[dpsrc].find(dpdst);
-            if(aln_it == (*tree)[dpsrc].end()) {
-                (*tree)[dpsrc][dpdst] = (Link){l_it->outport, l_it->inport, l_it->weight};
-                (*tree)[dpdst][dpsrc] = (Link){l_it->inport, l_it->outport, l_it->weight};
-            } else {
-                if(l_it->weight < (*tree)[dpsrc][dpdst].weight) {
-                    (*tree)[dpsrc][dpdst].weight = l_it->weight;
-                    (*tree)[dpdst][dpsrc].weight = l_it->weight;
-                }
-            }
-        }
-        dpsrc = dpdst;
-    }
-    mt_map[group].updated = false;
     return true;
 }
 
@@ -214,6 +218,14 @@ MC_routing_module::has_multicast_route(ipaddr group, ipaddr src)
     if(has_multicast_route(group)) 
         return mt_map[group].srcs->find(src) != mt_map[group].srcs->end();
     return false;
+}
+
+size_t 
+MC_routing_module::get_multicast_dst_size(ipaddr group, ipaddr src)
+{
+    if(has_multicast_route(group, src))
+        return (*mt_map[group].srcs)[src].dsts->size();
+    return 0;
 }
     
 bool 
@@ -245,11 +257,9 @@ MC_routing_module::handle_group_event(const Event& e)
             add_multicast_route(ge.group); 
         } else {
             if(get_multicast_route(ge.group, dsts, tree, srcs)) {  
-                add_multicast_source(ge.src, srcs);
-                add_source_group(ge.group, ge.src, srcs);
                 if(get_multicast_source(ge.src, srcs, sdsts, tree)) {                    
                     if(add_dst_port(sdsts, ge.dp, ge.port))
-                        (*srcs)[ge.src].updated = update_multicast_source_tree(tree, dsts, sdsts, ge.src); 
+                        update_multicast_source_tree(tree, dsts, sdsts, ge.src); 
                 }
             }
         }
@@ -260,22 +270,20 @@ MC_routing_module::handle_group_event(const Event& e)
             if(get_multicast_route(ge.group, dsts, tree, srcs)) {
                 if(get_multicast_source(ge.src, srcs, sdsts, tree)) {
                     if(remove_dst_port(sdsts, ge.dp, ge.port)) {
-                        (*srcs)[ge.src].updated = update_multicast_source_tree(tree, dsts, sdsts, ge.src);
+                        update_multicast_source_tree(tree, dsts, sdsts, ge.src);
                     }
                 }
-                remove_multicast_source(ge.src, srcs);
-                remove_source_group(ge.group, ge.src, srcs);
             }
         }
     } else if( ge.action == Group_event::TOEXCLUDE ) {
         if(ge.src.addr == 0) {
             if(get_multicast_route(ge.group, dsts, tree, srcs)) {  
                 if(add_dst_port(dsts, ge.dp, ge.port)) {
-                    mt_map[ge.group].updated = update_multicast_shared_tree(tree, dsts);
+                    update_multicast_shared_tree(tree, dsts);
                     for(MulticastSrcMap::iterator msm_it = srcs->begin(); msm_it != srcs->end(); msm_it++) {
                         get_multicast_source(msm_it->first, srcs, sdsts, tree);
                         if(sdsts->find(ge.dp) == sdsts->end()) 
-                            (*srcs)[ge.src].updated = update_multicast_source_tree(tree, dsts, sdsts, ge.src);
+                            update_multicast_source_tree(tree, dsts, sdsts, ge.src);
                     }
                 }
             }
@@ -284,11 +292,11 @@ MC_routing_module::handle_group_event(const Event& e)
         if(ge.src.addr == 0) {
             if(get_multicast_route(ge.group, dsts, tree, srcs)) { 
                 if(remove_dst_port(dsts, ge.dp, ge.port)) {
-                    mt_map[ge.group].updated = update_multicast_shared_tree(tree, dsts);
+                    update_multicast_shared_tree(tree, dsts);
                     for(MulticastSrcMap::iterator msm_it = srcs->begin(); msm_it != srcs->end(); msm_it++) {
                         get_multicast_source(msm_it->first, srcs, sdsts, tree);
                         if(sdsts->find(ge.dp) == sdsts->end()) 
-                            (*srcs)[ge.src].updated = update_multicast_source_tree(tree, dsts, sdsts, ge.src);
+                            update_multicast_source_tree(tree, dsts, sdsts, ge.src);
                     }
                 }
             }
@@ -296,6 +304,45 @@ MC_routing_module::handle_group_event(const Event& e)
     }
     
     return CONTINUE;
+}
+
+Disposition 
+MC_routing_module::handle_linkpw_change(const Event& e)
+{
+    const Linkpw_event& le = assert_cast<const Linkpw_event&>(e);
+    if(le.action != Linkpw_event::REMOVE) return CONTINUE; 
+
+    DstPortMapPtr dsts, sdsts;
+    AdjListPtr tree;
+    MulticastSrcMapPtr srcs;
+    
+    for(MulticastTreeMap::iterator mm_it = mt_map.begin();
+        mm_it != mt_map.end(); mm_it++) {
+        get_multicast_route(mm_it->first, dsts, tree, srcs);
+        if(is_link_changed(tree, le)) 
+            update_multicast_shared_tree(tree, dsts);
+
+        for(MulticastSrcMap::iterator msm_it = srcs->begin(); msm_it != srcs->end(); msm_it++) {
+            get_multicast_source(msm_it->first, srcs, sdsts, tree);
+            if(is_link_changed(tree, le)) 
+                update_multicast_source_tree(tree, dsts, sdsts, msm_it->first);
+        }
+    }
+
+    return CONTINUE;    
+}
+
+bool 
+MC_routing_module::is_link_changed(const AdjListPtr& tree, const Linkpw_event& le)
+{
+    if( tree->find(le.dpsrc) != tree->end() ) {
+        if( (*tree)[le.dpsrc].find(le.dpdst) != (*tree)[le.dpsrc].end() ) {
+            if( (*tree)[le.dpsrc][le.dpdst].srcport == le.sport &&
+                (*tree)[le.dpsrc][le.dpdst].dstport == le.dport)
+                return true;
+        }
+    }
+    return false;
 }
 
 bool 
@@ -318,7 +365,7 @@ MC_routing_module::add_multicast_route(const ipaddr g)
         DstPortMapPtr dsts = (DstPortMapPtr) new DstPortMap;
         AdjListPtr tree = (AdjListPtr) new AdjList;
         MulticastSrcMapPtr srcs = (MulticastSrcMapPtr) new MulticastSrcMap; 
-        mt_map[g] = (MulticastRoute){srcs, dsts, tree, false};
+        mt_map[g] = (MulticastRoute){srcs, dsts, tree};
     } 
 }
 
@@ -337,6 +384,7 @@ MC_routing_module::remove_multicast_route(const ipaddr g)
 bool 
 MC_routing_module::get_multicast_source(const ipaddr src, MulticastSrcMapPtr& srcs, DstPortMapPtr& dsts, AdjListPtr& tree)
 {
+    add_multicast_source(src, srcs);
     if(srcs->find(src) != srcs->end()) {
         dsts = (*srcs)[src].dsts;
         tree = (*srcs)[src].tree;
@@ -351,7 +399,7 @@ MC_routing_module::add_multicast_source(const ipaddr src, MulticastSrcMapPtr& sr
     if(srcs->find(src) == srcs->end()) {
         DstPortMapPtr dsts = (DstPortMapPtr) new DstPortMap;
         AdjListPtr tree = (AdjListPtr) new AdjList;
-        (*srcs)[src] = (MulticastSrc){dsts, tree, false};
+        (*srcs)[src] = (MulticastSrc){dsts, tree};
     }
 }
 
@@ -391,26 +439,6 @@ MC_routing_module::remove_dst_port(DstPortMapPtr& dsts, const datapathid& dpid, 
     }
     
     return bNeedUpdated;
-}
-
-void
-MC_routing_module::add_source_group(const ipaddr g, const ipaddr src, const MulticastSrcMapPtr& srcs)
-{
-    if(srcs->find(src) != srcs->end()) {
-        if(sg_map.find(src) == sg_map.end()) 
-            sg_map[src] = GroupSet();
-        sg_map[src].insert(g);
-    }
-}
-
-void
-MC_routing_module::remove_source_group(const ipaddr g, const ipaddr src, const MulticastSrcMapPtr& srcs)
-{
-    if(srcs->find(src) == srcs->end()) {
-        sg_map[src].erase(g);
-        if(sg_map[src].size() == 0) 
-            sg_map.erase(src);
-    }
 }
 
 bool

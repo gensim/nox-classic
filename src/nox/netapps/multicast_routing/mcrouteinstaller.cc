@@ -30,7 +30,9 @@ namespace vigil
     register_handler<Packet_in_event>
         (boost::bind(&mcrouteinstaller::handle_pkt_in, this, _1));
     register_handler<Flow_removed_event>
-        (boost::bind(&mcrouteinstaller::handle_flow_removed, this, _1));        
+        (boost::bind(&mcrouteinstaller::handle_flow_removed, this, _1));  
+    register_handler<Linkpw_event>
+        (boost::bind(&mcrouteinstaller::handle_linkpw_change, this, _1));
   }
   
   void mcrouteinstaller::getInstance(const container::Context* ctxt, 
@@ -109,7 +111,7 @@ namespace vigil
     
     hash_set<ipaddr> route_install;
     hash_set<ipaddr> route_remove;
-    
+      
     if(gbr_map.find(group) != gbr_map.end()) {
         if(src == (uint32_t)0) {
             for(SrcBlockedRuleMap::iterator it = gbr_map[group].begin();
@@ -191,7 +193,50 @@ namespace vigil
     else
     {       
         delete_routed_table_entry(src, group, dpid, cookie);
+    }    
+    
+    return CONTINUE;    
+  }
+  
+  Disposition mcrouteinstaller::handle_linkpw_change(const Event& e)
+  {
+    const Linkpw_event& le = assert_cast<const Linkpw_event&>(e);
+    if(le.action != Linkpw_event::REMOVE) return CONTINUE;   
+    
+    for(GroupRoutedRuleMap::iterator grr_it = grr_map.begin(); grr_it != grr_map.end(); grr_it++) {
+        hash_set<ipaddr> route_install;
+        hash_set<ipaddr> route_remove;
+        ipaddr group = grr_it->first;
+        for(SrcRoutedRuleMap::iterator srr_it = grr_it->second.begin(); srr_it != grr_it->second.end(); srr_it++) {
+            ipaddr src = srr_it->first;            
+            if(srr_it->second.act.find(le.dpsrc) != srr_it->second.act.end()) {
+                ofp_action_list* oal = &srr_it->second.act[le.dpsrc];
+                for(std::list<ofp_action>::iterator a_it = oal->action_list.begin(); 
+                    a_it != oal->action_list.end(); a_it++) {
+                    of_action_header oah = a_it->get_header();
+                    of_action_output* oao = (of_action_output*)&oah;
+                    if(oao->port == le.sport) {
+                        if(mcrouting->has_multicast_route(group, src) ||
+                            mcrouting->get_multicast_dst_size(group) != 0) {
+                            route_install.insert(src);
+                        } else {
+                            route_remove.insert(src);
+                        }
+                        continue;
+                    }
+                }
+            }
+        }
+        for(hash_set<ipaddr>::iterator it = route_install.begin();
+            it != route_install.end(); it++) {
+            install_route(*it, group);
+        }
+        for(hash_set<ipaddr>::iterator it = route_remove.begin();
+            it != route_remove.end(); it++) {
+            remove_route(*it, group);
+        }
     }
+    
     
     
     return CONTINUE;    
@@ -205,9 +250,10 @@ namespace vigil
   {
     network::route rte(datapathid(), OFPP_NONE);   
     hash_map<datapathid,ofp_action_list> act_list;    
-    if(!mcrouting->get_multicast_tree_path(src, group, rte, &act_list)) return;
+    Src2TreeListPtr stot;
+    if(!mcrouting->get_multicast_tree_path(src, group, rte, stot,&act_list)) return;
     
-    if(add_routing_table_entry(src, group, rte, act_list))
+    if(add_routing_table_entry(src, group, rte, stot, act_list))
       real_install_route(src, group, rte, buffer_id, act_list, true, idletime, hardtime);   
   }
   
@@ -291,7 +337,8 @@ namespace vigil
   }
   
   bool mcrouteinstaller::add_routing_table_entry(const ipaddr src, const ipaddr group, 
-                                                 network::route route, hash_map<datapathid,ofp_action_list>& act_list)
+                                                 network::route route, Src2TreeListPtr& stot,
+                                                 hash_map<datapathid,ofp_action_list>& act_list)
   {    
     if(grr_map.find(group) == grr_map.end()) 
         grr_map[group] = SrcRoutedRuleMap();
@@ -299,7 +346,7 @@ namespace vigil
     VLOG_DBG(lg,"Add routing flow src=%s group=%s of dpid=%"PRIx64"", 
           src.string().c_str(), group.string().c_str(), route.in_switch_port.dpid.as_host() );
     if(grr_map[group].find(src) == grr_map[group].end()) {
-        grr_map[group][src] = (RoutedRule){route.in_switch_port.dpid,1, act_list};
+        grr_map[group][src] = (RoutedRule){route.in_switch_port.dpid,1, act_list, stot};
     } else {
         if(grr_map[group][src].dpsrc != route.in_switch_port.dpid) 
             grr_map[group][src].cookie = 1;

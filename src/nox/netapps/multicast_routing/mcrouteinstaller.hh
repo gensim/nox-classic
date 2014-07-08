@@ -118,6 +118,9 @@ namespace vigil
     /** Reference to multicast routing module.
      */
     MC_routing_module* mcrouting;
+    /** Reference to topology module.
+     */
+    Topology *topology;
     
     /** Buffer for openflow message.
      */

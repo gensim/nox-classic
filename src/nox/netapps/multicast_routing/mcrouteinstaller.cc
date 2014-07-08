@@ -23,6 +23,7 @@ namespace vigil
   void mcrouteinstaller::install() 
   {
     resolve(mcrouting);
+    resolve(topology);
     
     register_handler<Group_event>
         (boost::bind(&mcrouteinstaller::handle_group_event, this, _1));
@@ -58,18 +59,23 @@ namespace vigil
        mcrouting->get_multicast_dst_size(group) != 0) {
         if(grr_map.find(group) != grr_map.end() &&
             grr_map[group].find(src) != grr_map[group].end()) { 
-            if(grr_map[group][src].act.find(pie.datapath_id) != grr_map[group][src].act.end()) { 
-                if(pie.buffer_id!=-1)
-                    forward_routed_flow(pie.datapath_id, src, group, pie.in_port,
-                                        grr_map[group][src].act[pie.datapath_id], pie.buffer_id);
-                else
-                    forward_routed_flow(pie.datapath_id, src, group, pie.in_port,
-                                        grr_map[group][src].act[pie.datapath_id], *pie.get_buffer());
-            } else {
-                VLOG_ERR(lg, "Routed flow src=%s group=%s, but no dpid=%"PRIx64"",
-                    src.string().c_str(), group.string().c_str(), pie.datapath_id.as_host());
-            }
-            return CONTINUE;
+            bool srcChanged = false;
+            if(!topology->is_internal(pie.datapath_id, pie.in_port))
+                srcChanged = (grr_map[group][src].dpsrc!=pie.datapath_id);
+            if(!srcChanged) {   
+                if(grr_map[group][src].act.find(pie.datapath_id) != grr_map[group][src].act.end()) { 
+                    if(pie.buffer_id!=-1)
+                        forward_routed_flow(pie.datapath_id, src, group, pie.in_port,
+                                            grr_map[group][src].act[pie.datapath_id], pie.buffer_id);
+                    else
+                        forward_routed_flow(pie.datapath_id, src, group, pie.in_port,
+                                            grr_map[group][src].act[pie.datapath_id], *pie.get_buffer());
+                } else {
+                    VLOG_ERR(lg, "Routed flow src=%s group=%s, but no dpid=%"PRIx64"",
+                        src.string().c_str(), group.string().c_str(), pie.datapath_id.as_host());
+                }
+                return CONTINUE;
+            }            
         }
         install_route(src, group, pie.buffer_id);
     } else {

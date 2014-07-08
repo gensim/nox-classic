@@ -123,9 +123,6 @@
 	            "lavi_hosts",
                 "lavi_host2sw"
                 ], 
-            "HostIP_location_event": [
-                "mc_routing_module"
-                ],    
             "Group_event": [
                 "mc_routing_module",
                 "mcrouteinstaller"

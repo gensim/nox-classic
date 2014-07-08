@@ -39,8 +39,6 @@ MC_routing_module::install()
     //register event handlers 
     register_handler<Group_event>
         (boost::bind(&MC_routing_module::handle_group_event, this, _1));
-    register_handler<HostIP_location_event>
-        (boost::bind(&MC_routing_module::handle_hostip_location, this, _1));
 }
 
 void 
@@ -144,6 +142,7 @@ MC_routing_module::get_multicast_source_tree(const ipaddr& src,
             (*dsts)[it->first] = PortSet();
         (*dsts)[it->first].insert(it->second.begin(), it->second.end());
     }
+    (*(mt_map[group].srcs))[src].updated = false;
     return true;
 }
 
@@ -205,7 +204,7 @@ MC_routing_module::get_multicast_shared_tree(const datapathid& src,
         }
         dpsrc = dpdst;
     }
-    
+    mt_map[group].updated = false;
     return true;
 }
 
@@ -288,38 +287,12 @@ MC_routing_module::handle_group_event(const Event& e)
                     mt_map[ge.group].updated = update_multicast_shared_tree(tree, dsts);
                     for(MulticastSrcMap::iterator msm_it = srcs->begin(); msm_it != srcs->end(); msm_it++) {
                         get_multicast_source(msm_it->first, srcs, sdsts, tree);
-                        if(sdsts->find(ge.dp) != sdsts->end()) 
+                        if(sdsts->find(ge.dp) == sdsts->end()) 
                             (*srcs)[ge.src].updated = update_multicast_source_tree(tree, dsts, sdsts, ge.src);
                     }
                 }
             }
         }
-    }
-    
-    return CONTINUE;
-}
-
-Disposition 
-MC_routing_module::handle_hostip_location(const Event& e)
-{
-    const HostIP_location_event& hle = assert_cast<const HostIP_location_event&>(e);
-    
-    DstPortMapPtr dsts, sdsts;
-    AdjListPtr tree;
-    MulticastSrcMapPtr srcs;
-        
-    if(hle.eventType == HostIP_location_event::ADD ||
-        hle.eventType == HostIP_location_event::MODIFY) {
-        if(sg_map.find(hle.host) != sg_map.end()) {
-            for(GroupSet::iterator it = sg_map[hle.host].begin(); 
-                it != sg_map[hle.host].end(); it++) {
-                if(get_multicast_route(*it, dsts, tree, srcs)) {  
-                   if(get_multicast_source(hle.host, srcs, sdsts, tree))                     
-                       (*srcs)[hle.host].updated = update_multicast_source_tree(tree, dsts, sdsts, hle.host); 
-                }
-            }
-            VLOG_DBG(log, "Handled new host IP %s", hle.host.string().c_str());
-        }        
     }
     
     return CONTINUE;
@@ -448,11 +421,9 @@ MC_routing_module::update_multicast_source_tree(AdjListPtr& mctree, const DstPor
         return true;
     }
     VLOG_DBG(log, "Update multicast source tree src");
-    hostiptracker::location sloc = hit->get_latest_location(src);    
-    if(sloc.dpid.empty()) return false;
     
     DstSetPtr dsp = (DstSetPtr) new DstSet;
-    dsp->insert(sloc.dpid);
+
     DstPortMap::iterator it;
     for(it = dsts->begin(); it != dsts->end(); it++) dsp->insert(it->first);
     for(it = sdsts->begin(); it != sdsts->end(); it++) dsp->insert(it->first);

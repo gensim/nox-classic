@@ -196,7 +196,6 @@ private:
     hostiptracker *hit;   
     
     Disposition handle_group_event(const Event& e);
-    Disposition handle_hostip_location(const Event& e);
     
     bool get_multicast_route(const ipaddr g, DstPortMapPtr& dsts, AdjListPtr& tree, MulticastSrcMapPtr& srcs);
     void add_multicast_route(const ipaddr g);

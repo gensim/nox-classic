@@ -65,12 +65,10 @@ namespace vigil
  
     if (tx)
       return (float) ((double) ll.txLoad*8)/ \
-	(((double) dpmem->get_link_speed(dpid, port))*1024*1024*1000*\
-	 ((double) ll.interval));
+	 (100.0*1024*1024*((double) ll.interval));
     else
       return (float) ((double) ll.rxLoad*8)/ \
-	(((double) dpmem->get_link_speed(dpid, port))*1024*1024*1000*\
-	 ((double) ll.interval));
+     (100.0*1024*1024*((double) ll.interval));
   }
 
   linkload::load linkload::get_link_load(datapathid dpid, uint16_t port)
@@ -105,12 +103,15 @@ namespace vigil
   {
     timeval tv = {0,0};
     if (dpmem->dp_events.size() == 0)
+    {
       tv.tv_sec = load_interval;
+    }
     else
-      tv.tv_sec = load_interval/dpmem->dp_events.size();
-
-    if (tv.tv_sec == 0)
-      tv.tv_sec = 1;
+    {
+      long long t = ((long long)load_interval)*1000000/dpmem->dp_events.size();
+      tv.tv_sec = t/1000000;
+      tv.tv_usec = t-(((long long)tv.tv_sec)*1000000);
+    }
 
     return tv;
   }

@@ -18,10 +18,8 @@
 #endif
 
 #define LINKWIGHT_DEFAULT_INTERVAL LINKLOAD_DEFAULT_INTERVAL
-#define LINKWIGHT_RATIO_CONGESTION 0.9
-#define LINKWIGHT_RATIO_HIGH_MIDDLE 0.7
-#define LINKWIGHT_RATIO_MIDDLE_LOW 0.4
-#define LINKWIGHT_DEFAULT_ALPHA 1
+#define LINKWIGHT_DEFAULT_ALPHA 0
+#define LINKWIGHT_DEFAULT_DIFF 0.1
 
 namespace vigil
 {
@@ -32,13 +30,6 @@ namespace vigil
     : public Component 
   {
   public:
-      
-    enum Linkphase {
-      LP_LOW,
-      LP_MIDDLE,
-      LP_HIGH,
-      LP_CONGESTION        
-    };  
       
     struct Link {
         datapathid dpsrc;
@@ -55,14 +46,9 @@ namespace vigil
         bool operator()(const Link& a, const Link& b) const;
     };
     
-    struct phaseweight {
-        Linkphase phase;
-        Linkweight weight;
-    };
+    typedef hash_map<Link, double, linkhash, linkeq> LinkRatioMap;    
     
-    typedef hash_map<Link, phaseweight, linkhash, linkeq> PhaseWeightMap;    
-    
-    PhaseWeightMap phaseweightmap;
+    LinkRatioMap lr_map;
     
     /** Interval to query for weight
      */
@@ -71,6 +57,10 @@ namespace vigil
     /* The parameter to calculate linkweight
      */
     double alpha;
+    
+    /* The parameter to diff between new ratio and old ratio
+     */
+    double diff;
 
     /** \brief Constructor of linkphaseweight.
      *
@@ -120,18 +110,24 @@ namespace vigil
     
     /** Iterator for probing
      */
-    PhaseWeightMap::iterator pwm_it;
+    LinkRatioMap::iterator lrm_it;
     
     /** \brief Update phaseweightmap
      * @param it iterator of phaseweightmap
      */
-    void updatePhaseWeight(PhaseWeightMap::iterator& it);
+    void updatePhaseWeight(LinkRatioMap::iterator& it);
     
     /** \brief Get next time to send probe
      *
      * @return time for next probe
      */
     timeval get_next_time();
+    
+    /** \brief Calculate weight
+     *
+     * @return weight of link
+     */
+    Linkweight calculate_weight(double ratio);
             
   };
 }

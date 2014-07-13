@@ -371,15 +371,7 @@ void
 Group_manager::v3_group_member_callback(const Group& g)
 {
     if(gr_map.find(g)==gr_map.end()) return; 
-    if(gr_map[g]->filter == IFM_EXCLUDE) {
-        gr_map[g]->filter = IFM_INCLUDE;
-        for(SrcTimeoutSet::iterator sts_iter=gr_map[g]->st_set.begin(); sts_iter!=gr_map[g]->st_set.end(); sts_iter++)
-            delete_group_timeout_source(g, *sts_iter);
-        post(new Group_event(g.addr, g.dp, g.port, Group_event::TOINCLUDE));            
-    }
-    if(gr_map[g]->filter == IFM_INCLUDE && gr_map[g]->st_map.size() == 0) {
-        delete_group(g);
-    }
+    delete_group(g);    
 }
 
 void

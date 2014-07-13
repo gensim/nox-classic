@@ -28,6 +28,7 @@ namespace vigil
   
   void linkphaseweight::configure(const Configuration* c) 
   {
+    resolve(lload);
     //Get commandline arguments
     const hash_map<string, string> argmap = \
       c->get_arguments_list();
@@ -36,18 +37,23 @@ namespace vigil
     if (i != argmap.end())
       weight_interval = atoi(i->second.c_str());
     else
-      weight_interval = LINKWIGHT_DEFAULT_INTERVAL;  
+      weight_interval = lload->load_interval;  
     
     i = argmap.find("alpha");
     if (i != argmap.end())
       alpha = atof(i->second.c_str());
     else
-      alpha = LINKWIGHT_DEFAULT_ALPHA;  
+      alpha = LINKWIGHT_DEFAULT_ALPHA; 
+    
+    diff = 0;
+    i = argmap.find("diff");
+    if (i != argmap.end())
+      diff = atof(i->second.c_str());
+    if (diff == 0)
+      diff = LINKWIGHT_DEFAULT_DIFF;     
        
-    resolve(lload);
     register_event(Linkpw_event::static_get_name());
     
-    lload->load_interval = weight_interval;
   }
   
   void linkphaseweight::install()
@@ -55,7 +61,7 @@ namespace vigil
     register_handler<Link_event>
         (boost::bind(&linkphaseweight::handle_link_change, this, _1));
         
-    pwm_it = phaseweightmap.begin();
+    lrm_it = lr_map.begin();
     
     post(boost::bind(&linkphaseweight::periodic_probe, this), get_next_time());
   }
@@ -74,24 +80,24 @@ namespace vigil
     
     Link link = {le.dpsrc, le.dpdst, le.sport, le.dport};
     
-    PhaseWeightMap::iterator i = phaseweightmap.find(link); 
+    LinkRatioMap::iterator i = lr_map.find(link); 
     
     if(le.action == Link_event::REMOVE) {
-        if(i !=  phaseweightmap.end()) {
-            post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::REMOVE, phaseweightmap[link].weight));
-            if(pwm_it == i) pwm_it++;
-            phaseweightmap.erase(i);            
+        if(i !=  lr_map.end()) {
+            post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::REMOVE, calculate_weight(lr_map[link])));
+            if(lrm_it == i) lrm_it++;
+            lr_map.erase(i);            
         } else {
             VLOG_WARN(lg, "Duplicate Remove Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
                 le.dpsrc.as_host(), le.dpdst.as_host(), le.sport, le.dport);
         }
     } else if(le.action == Link_event::ADD) {
-        if(i == phaseweightmap.end()) {
+        if(i == lr_map.end()) {
             Link tmp;
-            tmp = (pwm_it == phaseweightmap.end()) ? link: pwm_it->first;
-            phaseweightmap.insert(make_pair(link, (phaseweight){LP_LOW, Linkweight(1)}));
-            pwm_it = phaseweightmap.find(tmp);
-            post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::ADD, phaseweightmap[link].weight));
+            tmp = (lrm_it == lr_map.end()) ? link: lrm_it->first;
+            lr_map.insert(make_pair(link, 0));
+            lrm_it = lr_map.find(tmp);
+            post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::ADD, calculate_weight(lr_map[link])));
         } else {
             VLOG_WARN(lg, "Duplicate Add Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
                 le.dpsrc.as_host(), le.dpdst.as_host(), le.sport, le.dport);
@@ -100,10 +106,17 @@ namespace vigil
     return CONTINUE;
   }
   
+  Linkweight linkphaseweight::calculate_weight(double ratio)
+  {
+    Linkweight w = (Linkweight){(1/diff)*(1-alpha + alpha * ratio), /*((1-diff)<=ratio )?1:*/0};
+    return w;
+  }
+  
   Linkweight linkphaseweight::get_link_weight(const Link& link)
   {
-    if(phaseweightmap.find(link) != phaseweightmap.end()) {
-      return phaseweightmap[link].weight;  
+    if(lr_map.find(link) != lr_map.end()) {
+        
+      return calculate_weight(lr_map[link]);  
     }
     return Linkweight();
   }
@@ -115,30 +128,29 @@ namespace vigil
   
   void linkphaseweight::periodic_probe()
   {
-    if (pwm_it != phaseweightmap.end())
+    if (lrm_it != lr_map.end())
     {
       
       VLOG_DBG(lg, "Probe weight to Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16")",
-           pwm_it->first.dpsrc.as_host(), pwm_it->first.dpdst.as_host(), pwm_it->first.sport, pwm_it->first.dport);
+           lrm_it->first.dpsrc.as_host(), lrm_it->first.dpdst.as_host(), lrm_it->first.sport, lrm_it->first.dport);
 
-      updatePhaseWeight(pwm_it);
+      updatePhaseWeight(lrm_it);
       
-      if(phaseweightmap.size() > 0) {
-          pwm_it++;
-          if(pwm_it == phaseweightmap.end()) pwm_it = phaseweightmap.begin();
+      if(lr_map.size() > 0) {
+          lrm_it++;
+          if(lrm_it == lr_map.end()) lrm_it = lr_map.begin();
       } else {
-          pwm_it = phaseweightmap.end();
+          lrm_it = lr_map.end();
       }
     }
 
     post(boost::bind(&linkphaseweight::periodic_probe, this), get_next_time());
   }
   
-  void linkphaseweight::updatePhaseWeight(PhaseWeightMap::iterator& it)
+  void linkphaseweight::updatePhaseWeight(LinkRatioMap::iterator& it)
   {
     float tx_ratio, rx_ratio, ratio;
-    Linkphase old_phase, new_phase;
-    bool is_post = false;
+    Linkweight new_weight, old_weight;
 
     linkload::load tx_load = lload->get_link_load(it->first.dpsrc, it->first.sport);
     linkload::load rx_load = lload->get_link_load(it->first.dpdst, it->first.dport);
@@ -147,47 +159,36 @@ namespace vigil
     if(rx_load.interval == 0) rx_ratio = 0;
     else rx_ratio = lload->get_link_load_ratio(it->first.dpdst, it->first.dport, false);
     ratio = (tx_ratio >= rx_ratio) ? tx_ratio : rx_ratio ;
-
-    old_phase = it->second.phase;
-    if(ratio > LINKWIGHT_RATIO_CONGESTION)
-      new_phase = LP_CONGESTION;
-    else if(ratio > LINKWIGHT_RATIO_HIGH_MIDDLE && ratio <= LINKWIGHT_RATIO_CONGESTION)
-      new_phase = LP_HIGH;
-    else if(ratio > LINKWIGHT_RATIO_MIDDLE_LOW && ratio <= LINKWIGHT_RATIO_HIGH_MIDDLE)
-      new_phase = LP_MIDDLE;
-    else 
-      new_phase = LP_LOW;
-
-    if(old_phase != LP_CONGESTION) {
-      if(new_phase == LP_CONGESTION) 
-        is_post = true;
-      else if(new_phase < old_phase)
-        is_post = true;
-    } else {
-      if(new_phase < LP_HIGH)
-        is_post = true;
-    }
-
-    if(is_post) {        
-      it->second.phase = new_phase;  
-      Linkweight new_weight = (uint64_t)(1 + ((1.0/alpha) -1) * ratio);
-      if(new_phase == LP_CONGESTION) new_weight.setInfinity(1);
-      
-      post(new Linkpw_event(it->first.dpsrc, it->first.dpsrc, it->first.sport, it->first.dport, 
-                            Linkpw_event::CHANGE, phaseweightmap[it->first].weight, new_weight));
+    
+    double rdiff = (ratio > lr_map[it->first])? (ratio - lr_map[it->first]) : (lr_map[it->first] - ratio);
+    
+    if( rdiff >= diff ) {  
+      old_weight = calculate_weight(lr_map[it->first]);
+      new_weight = calculate_weight(ratio);
+      lr_map[it->first] = ratio;
+      if( new_weight != old_weight ) {
+        post(new Linkpw_event(it->first.dpsrc, it->first.dpsrc, it->first.sport, it->first.dport, 
+                                Linkpw_event::CHANGE, old_weight, new_weight));
+        VLOG_ERR(lg, "Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") weight change from %s to %s",
+            it->first.dpsrc.as_host(), it->first.dpdst.as_host(), it->first.sport, it->first.dport, 
+            old_weight.string().c_str(), new_weight.string().c_str());
+      }
     }
   }
   
   timeval linkphaseweight::get_next_time()
   {
     timeval tv = {0,0};
-    if (phaseweightmap.size() == 0)
+    if (lr_map.size() == 0)
+    {
       tv.tv_sec = weight_interval;
+    }
     else
-      tv.tv_sec = weight_interval/phaseweightmap.size();
-
-    if (tv.tv_sec == 0)
-      tv.tv_sec = 1;
+    {
+      long long t = ((long long)weight_interval)*1000000/lr_map.size();
+      tv.tv_sec = t/1000000;
+      tv.tv_usec = t-(((long long)tv.tv_sec)*1000000);
+    }
 
     return tv;
   }

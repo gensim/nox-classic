@@ -257,6 +257,7 @@ MC_routing_module::handle_group_event(const Event& e)
             add_multicast_route(ge.group); 
         } else {
             if(get_multicast_route(ge.group, dsts, tree, srcs)) {  
+                add_multicast_source(ge.src, srcs);
                 if(get_multicast_source(ge.src, srcs, sdsts, tree)) {                    
                     if(add_dst_port(sdsts, ge.dp, ge.port))
                         update_multicast_source_tree(tree, dsts, sdsts, ge.src); 
@@ -273,6 +274,7 @@ MC_routing_module::handle_group_event(const Event& e)
                         update_multicast_source_tree(tree, dsts, sdsts, ge.src);
                     }
                 }
+                remove_multicast_source(ge.src, srcs);
             }
         }
     } else if( ge.action == Group_event::TOEXCLUDE ) {
@@ -384,7 +386,6 @@ MC_routing_module::remove_multicast_route(const ipaddr g)
 bool 
 MC_routing_module::get_multicast_source(const ipaddr src, MulticastSrcMapPtr& srcs, DstPortMapPtr& dsts, AdjListPtr& tree)
 {
-    add_multicast_source(src, srcs);
     if(srcs->find(src) != srcs->end()) {
         dsts = (*srcs)[src].dsts;
         tree = (*srcs)[src].tree;

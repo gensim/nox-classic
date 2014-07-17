@@ -45,12 +45,12 @@ namespace vigil
     else
       alpha = LINKWIGHT_DEFAULT_ALPHA; 
     
-    diff = 0;
-    i = argmap.find("diff");
+    part = 0;
+    i = argmap.find("part");
     if (i != argmap.end())
-      diff = atof(i->second.c_str());
-    if (diff == 0)
-      diff = LINKWIGHT_DEFAULT_DIFF;     
+      part = atof(i->second.c_str());
+    if (part == 0)
+      part = LINKWIGHT_DEFAULT_PART;     
        
     register_event(Linkpw_event::static_get_name());
     
@@ -108,7 +108,8 @@ namespace vigil
   
   Linkweight linkphaseweight::calculate_weight(double ratio)
   {
-    Linkweight w = (Linkweight){(1/diff)*(1-alpha + alpha * ratio), /*((1-diff)<=ratio )?1:*/0};
+    int s = part*( (1-alpha) + alpha * ratio );  
+    Linkweight w = (Linkweight){s, /*((1-diff)<=ratio )?1:*/0};
     return w;
   }
   
@@ -160,6 +161,7 @@ namespace vigil
     else rx_ratio = lload->get_link_load_ratio(it->first.dpdst, it->first.dport, false);
     ratio = (tx_ratio >= rx_ratio) ? tx_ratio : rx_ratio ;
     
+    double diff = 1.0/part;
     double rdiff = (ratio > lr_map[it->first])? (ratio - lr_map[it->first]) : (lr_map[it->first] - ratio);
     
     if( rdiff >= diff ) {  

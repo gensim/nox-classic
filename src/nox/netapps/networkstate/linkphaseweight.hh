@@ -19,7 +19,7 @@
 
 #define LINKWIGHT_DEFAULT_INTERVAL LINKLOAD_DEFAULT_INTERVAL
 #define LINKWIGHT_DEFAULT_ALPHA 0
-#define LINKWIGHT_DEFAULT_DIFF 0.1
+#define LINKWIGHT_DEFAULT_PART 10
 
 namespace vigil
 {
@@ -60,7 +60,7 @@ namespace vigil
     
     /* The parameter to diff between new ratio and old ratio
      */
-    double diff;
+    int part;
 
     /** \brief Constructor of linkphaseweight.
      *

@@ -103,7 +103,10 @@ namespace vigil
                   src.string().c_str(), group.string().c_str(), ge.action);
         return CONTINUE;
     }
-    if(gbr_map.find(group) == gbr_map.end() && grr_map.find(group) == grr_map.end()) {
+    if( (gbr_map.find(group) == gbr_map.end() || 
+        (gbr_map.find(group) != gbr_map.end() && gbr_map[group].find(src) == gbr_map[group].end())) && 
+        (grr_map.find(group) == grr_map.end() || 
+        (grr_map.find(group) != grr_map.end() && grr_map[group].find(src) == grr_map[group].end()))) {
         VLOG_DBG(lg, "No table has this group, src=%s group=%s",
                   src.string().c_str(), group.string().c_str());
         return CONTINUE;

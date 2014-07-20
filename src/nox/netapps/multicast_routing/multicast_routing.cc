@@ -520,7 +520,7 @@ MC_routing_module::complete_subgraph(AdjListPtr& subgraph, const DstSetPtr& dsp,
                     (*subgraph)[*dst_it][*src_it] = 
                         (Link){route2->path.front().outport, route2->path.back().inport, route2->weight};
                     (*subgraph)[*src_it][*dst_it] = 
-                        (Link){route2->path.front().outport, route2->path.back().inport, route2->weight};
+                        (Link){route2->path.front().inport, route2->path.back().outport, route2->weight};
                 }
                 
             } else {
@@ -543,13 +543,17 @@ MC_routing_module::minimum_spanning_tree(const AdjListPtr& graph)
     while(!mh.isEmpty()) {
         MinHeapNodePtr minNode = mh.extractMin();
         datapathid u = minNode->dpid;
+        datapathid p = mh.getParent(u);
+        if(!p.empty()) {
+            (*tree)[p][u] = (Link){(*graph)[p][u].srcport, (*graph)[p][u].dstport, (*graph)[p][u].weight};
+            (*tree)[u][p] = (Link){(*graph)[u][p].srcport, (*graph)[u][p].dstport, (*graph)[u][p].weight};
+        }
         
         for(AdjListNode::iterator aln_it = (*graph)[u].begin(); aln_it != (*graph)[u].end(); aln_it++) {
             datapathid v = aln_it->first;
-            if(mh.isInMinHeap(v) && aln_it->second.weight < mh.getKey(v)) {
-                (*tree)[u][v] = (Link){(*graph)[u][v].srcport, (*graph)[u][v].dstport, aln_it->second.weight};
-                (*tree)[v][u] = (Link){(*graph)[v][u].srcport, (*graph)[v][u].dstport, aln_it->second.weight};
+            if(mh.isInMinHeap(v) && aln_it->second.weight < mh.getKey(v)) {                
                 mh.decreaseKey(v, aln_it->second.weight);
+                mh.setParent(u, v);
             }
         }
     }
@@ -580,22 +584,12 @@ MC_routing_module::reverse_mintree(const AdjListPtr& tree, const RouteDirection&
                 src = route->id.src;
                 for(std::list<Routing_module::Link>::iterator l_it = route->path.begin(); l_it != route->path.end(); l_it++) {
                     dst = l_it->dst;
-                    AdjList::iterator sub_it = subgraph->find(src);
-                    if(sub_it == subgraph->end()) {
-                        (*subgraph)[src][dst] = (Link){l_it->outport, l_it->inport, l_it->weight};
-                        (*subgraph)[dst][src] = (Link){l_it->inport, l_it->outport, l_it->weight};
-                    } else {
-                        AdjListNode::iterator aln_it = (*subgraph)[src].find(dst);
-                        if(aln_it == (*subgraph)[src].end()) {
-                            (*subgraph)[src][dst] = (Link){l_it->outport, l_it->inport, l_it->weight};
-                            (*subgraph)[dst][src] = (Link){l_it->inport, l_it->outport, l_it->weight};
-                        } else {
-                            if(l_it->weight < (*subgraph)[src][dst].weight) {
-                                (*subgraph)[src][dst].weight = l_it->weight;
-                                (*subgraph)[dst][src].weight = l_it->weight;
-                            }
-                        }
-                    }
+                    AdjList::iterator ssub_it = subgraph->find(src);
+                    if(ssub_it == subgraph->end()) (*subgraph)[src] = AdjListNode();                   
+                    (*subgraph)[src][dst] = (Link){l_it->outport, l_it->inport, l_it->weight};
+                    AdjList::iterator dsub_it = subgraph->find(dst);
+                    if(dsub_it == subgraph->end()) (*subgraph)[dst] = AdjListNode();                       
+                    (*subgraph)[dst][src] = (Link){l_it->inport, l_it->outport, l_it->weight};                    
                     src = dst;
                 }
             }            
@@ -613,19 +607,20 @@ MC_routing_module::fixup_leaves(AdjListPtr& mctree, const AdjListPtr& mintree, c
     mctree->clear();
     for(AdjList::iterator al_it = mintree->begin(); al_it != mintree->end(); al_it++) {
         (*mctree)[al_it->first] = al_it->second;
-        if(al_it->second.size() == 1) leaves.push(al_it->first);
+        if(al_it->second.size() == 1 && dsp->find(al_it->first) == dsp->end()) 
+            leaves.push(al_it->first);
     }
     
     while(!leaves.empty()) {
         datapathid u = leaves.front();
-        datapathid v = (*mctree)[u].begin()->first;
-        if(dsp->find(u) == dsp->end() && mctree->find(u) != mctree->end()) {
-            mctree->erase(u);
-            (*mctree)[v].erase(u);
-            if((*mctree)[v].size() == 1)
-                leaves.push(v);
-        }        
         leaves.pop();
+        for(AdjListNode::iterator vit = (*mctree)[u].begin(); vit != (*mctree)[u].end(); vit++) {
+            datapathid v = vit->first;                
+            (*mctree)[v].erase(u);
+            if((*mctree)[v].size() == 1 && dsp->find(v) == dsp->end())
+                leaves.push(v);
+        }
+        mctree->erase(u);
     }
 }
 
@@ -640,7 +635,8 @@ MC_routing_module::print_graph(const AdjListPtr& graph, int reason)
     for(AdjList::iterator al_it = graph->begin(); al_it != graph->end(); al_it++) {
         if(al_it->second.size() == 0) continue;
         for(AdjListNode::iterator aln_it = al_it->second.begin(); aln_it != al_it->second.end(); aln_it++) {
-            VLOG_DBG(log, "src=%"PRIx64", dst=%"PRIx64"", al_it->first.as_host(), aln_it->first.as_host());
+            VLOG_DBG(log, "src=%"PRIx64", dst=%"PRIx64" weight=%s", 
+                     al_it->first.as_host(), aln_it->first.as_host(), aln_it->second.weight.string().c_str());
         }
     }
 }

@@ -7,6 +7,8 @@
 
 #include "vlog.hh"
 
+//#define UNDIRECTED 1
+
 namespace vigil
 {
   static Vlog_module lg("linkphaseweight");
@@ -22,8 +24,13 @@ namespace vigil
   bool 
   linkphaseweight::linkeq::operator()(const Link& a, const Link& b) const
   {
-    return (a.dpsrc == b.dpsrc && a.dpdst == b.dpdst &&
-            a.sport == b.sport && a.dport == b.dport);
+    return ((a.dpsrc == b.dpsrc && a.dpdst == b.dpdst &&
+            a.sport == b.sport && a.dport == b.dport)
+#ifdef UNDIRECTED
+            ||(a.dpsrc == b.dpdst && a.dpdst == b.dpsrc &&
+            a.sport == b.dport && a.dport == b.sport)
+#endif
+            );
   }
   
   void linkphaseweight::configure(const Configuration* c) 
@@ -85,6 +92,9 @@ namespace vigil
     if(le.action == Link_event::REMOVE) {
         if(i !=  lr_map.end()) {
             post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::REMOVE, calculate_weight(lr_map[link])));
+#ifdef UNDIRECTED
+            post(new Linkpw_event(link.dpdst, link.dpsrc, link.dport, link.sport, Linkpw_event::REMOVE, calculate_weight(lr_map[link])));
+#endif
             if(lrm_it == i) lrm_it++;
             lr_map.erase(i);            
         } else {
@@ -98,6 +108,9 @@ namespace vigil
             lr_map.insert(make_pair(link, 0));
             lrm_it = lr_map.find(tmp);
             post(new Linkpw_event(link.dpsrc, link.dpdst, link.sport, link.dport, Linkpw_event::ADD, calculate_weight(lr_map[link])));
+#ifdef UNDIRECTED
+            post(new Linkpw_event(link.dpdst, link.dpsrc, link.dport, link.sport, Linkpw_event::ADD, calculate_weight(lr_map[link])));
+#endif
         } else {
             VLOG_WARN(lg, "Duplicate Add Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") ignored!",
                 le.dpsrc.as_host(), le.dpdst.as_host(), le.sport, le.dport);
@@ -109,7 +122,7 @@ namespace vigil
   Linkweight linkphaseweight::calculate_weight(double ratio)
   {
     int s = part*( (1-alpha) + alpha * ratio );  
-    Linkweight w = (Linkweight){s, /*((1-diff)<=ratio )?1:*/0};
+    Linkweight w = (Linkweight){s, 0};
     return w;
   }
   
@@ -150,16 +163,21 @@ namespace vigil
   
   void linkphaseweight::updatePhaseWeight(LinkRatioMap::iterator& it)
   {
-    float tx_ratio, rx_ratio, ratio;
     Linkweight new_weight, old_weight;
 
-    linkload::load tx_load = lload->get_link_load(it->first.dpsrc, it->first.sport);
-    linkload::load rx_load = lload->get_link_load(it->first.dpdst, it->first.dport);
-    if(tx_load.interval == 0) tx_ratio = 0;
-    else tx_ratio = lload->get_link_load_ratio(it->first.dpsrc, it->first.sport);
-    if(rx_load.interval == 0) rx_ratio = 0;
-    else rx_ratio = lload->get_link_load_ratio(it->first.dpdst, it->first.dport, false);
-    ratio = (tx_ratio >= rx_ratio) ? tx_ratio : rx_ratio ;
+    float rx_ratio1,ratio;
+    linkload::load load2 = lload->get_link_load(it->first.dpdst, it->first.dport);
+    if(load2.interval == 0) rx_ratio1 = 0;
+    else rx_ratio1 = lload->get_link_load_ratio(it->first.dpdst, it->first.dport, false);    
+#ifdef UNDIRECTED
+    float rx_ratio2;
+    linkload::load load1 = lload->get_link_load(it->first.dpsrc, it->first.sport);
+    if(load1.interval == 0) rx_ratio2 = 0;
+    else rx_ratio2 = lload->get_link_load_ratio(it->first.dpsrc, it->first.sport, false); 
+    ratio = (rx_ratio1 >= rx_ratio2) ? rx_ratio1 : rx_ratio2 ;
+#else
+    ratio = rx_ratio1;
+#endif
     
     double diff = 1.0/part;
     double rdiff = (ratio > lr_map[it->first])? (ratio - lr_map[it->first]) : (lr_map[it->first] - ratio);
@@ -169,11 +187,15 @@ namespace vigil
       new_weight = calculate_weight(ratio);
       lr_map[it->first] = ratio;
       if( new_weight != old_weight ) {
-        post(new Linkpw_event(it->first.dpsrc, it->first.dpsrc, it->first.sport, it->first.dport, 
+        post(new Linkpw_event(it->first.dpsrc, it->first.dpdst, it->first.sport, it->first.dport, 
                                 Linkpw_event::CHANGE, old_weight, new_weight));
-        VLOG_ERR(lg, "Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") weight change from %s to %s",
+#ifdef UNDIRECTED
+        post(new Linkpw_event(it->first.dpdst, it->first.dpsrc, it->first.dport, it->first.sport, 
+                                Linkpw_event::CHANGE, old_weight, new_weight));
+#endif
+        VLOG_DBG(lg, "Link(%"PRIx64",%"PRIx64",%"PRIx16",%"PRIx16") weight change from %s to %s while ratio=%f",
             it->first.dpsrc.as_host(), it->first.dpdst.as_host(), it->first.sport, it->first.dport, 
-            old_weight.string().c_str(), new_weight.string().c_str());
+            old_weight.string().c_str(), new_weight.string().c_str(), ratio);
       }
     }
   }

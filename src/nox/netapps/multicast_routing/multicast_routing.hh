@@ -101,6 +101,7 @@ private:
     struct MinHeapNode {
         Linkweight key;
         datapathid dpid;
+        datapathid parent;
         uint32_t idx;
     };
     typedef boost::shared_ptr<MinHeapNode> MinHeapNodePtr;
@@ -115,6 +116,7 @@ private:
                 MinHeapNodePtr newNode = (MinHeapNodePtr) new MinHeapNode();
                 newNode->key = Linkweight(Linkweight::MAX_INT, Linkweight::MAX_INT);
                 newNode->dpid = al_it->first;
+                newNode->parent = datapathid();
                 newNode->idx = i;
                 dps[al_it->first] = newNode;
                 pos[i] = newNode;
@@ -139,6 +141,14 @@ private:
             dps[u]->key = k;
         }
         
+        datapathid getParent(datapathid v) {
+            return dps[v]->parent;
+        }
+        
+        void setParent(datapathid u, datapathid v) {
+            dps[v]->parent = u;
+        }
+        
         MinHeapNodePtr extractMin() {
             assert(!isEmpty());
             
@@ -156,7 +166,7 @@ private:
             uint32_t i = dps[u]->idx;
             dps[u]->key = key;
             
-            while(i && pos[i]->key < pos[(i-1)/2]->key) { 
+            while((i!=0) && (pos[i]->key < pos[(i-1)/2]->key)) { 
                 swapNode(i, (i-1)/2);                
                 i = (i-1)/2;
             }
@@ -178,12 +188,12 @@ private:
         }
         
         void swapNode(uint32_t a, uint32_t b) {
+            pos[a]->idx = b;
+            pos[b]->idx = a;
+            
             MinHeapNodePtr t = pos[a];
             pos[a] = pos[b];
             pos[b] = t;
-            
-            pos[a]->idx = a;
-            pos[b]->idx = b;
         }
         
         typedef hash_map<datapathid, MinHeapNodePtr> DpMap;

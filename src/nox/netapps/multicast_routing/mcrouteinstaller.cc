@@ -528,8 +528,6 @@ namespace vigil
     of_raw.reset(new uint8_t[size]);
     
     act_list.pack(openflow_pack::get_pointer(of_raw));
-    VLOG_DBG(lg,"Forward flow src=%s group=%s of dpid=%"PRIx64"", 
-          src.string().c_str(), group.string().c_str(), dpid.as_host() );
     send_openflow_packet(dpid, buffer_id, (const ofp_action_header*)of_raw.get(), 
                          act_list.mem_size(), in_port, false);
   }
